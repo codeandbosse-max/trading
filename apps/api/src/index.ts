@@ -1,10 +1,13 @@
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { config } from './config';
 import { router } from './routes/resources';
 import { webhookRouter } from './routes/webhook';
+import { authRouter } from './routes/auth';
 import { errorHandler, notFound } from './middleware/errors';
+import { attachUser, requireAuth, requireWriteAccess } from './middleware/auth';
 import { repricePositions, runExecutionTick } from './services/execution';
 import { tasksRouter } from './routes/tasks';
 import { setDb, type Db } from './db/pool';
@@ -27,8 +30,12 @@ export function createApp(): express.Express {
   app.use('/api/webhook', webhookRouter);
 
   app.use(express.json({ limit: '256kb' }));
+  app.use(cookieParser());
+  app.use(attachUser);
+
+  app.use('/api/auth', authRouter);
   app.use('/api/tasks', tasksRouter);
-  app.use('/api', router);
+  app.use('/api', requireAuth, requireWriteAccess, router);
 
   app.use(notFound);
   app.use(errorHandler);

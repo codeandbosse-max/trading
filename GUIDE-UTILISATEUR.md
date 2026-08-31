@@ -47,6 +47,17 @@ Si une stratégie est branchée à trois comptes, un seul signal peut créer tro
 
 Comptez une quinzaine de minutes. Suivez les étapes dans l'ordre.
 
+### Étape 0 — Créer votre compte
+
+À la première visite, vous arrivez sur l'écran de connexion.
+
+- **Si personne n'a encore de compte**, un message vous l'indique : l'onglet **Inscription** est ouvert et le premier compte créé devient **administrateur**.
+- **Sinon**, l'inscription demande un **code d'invitation** à réclamer à votre administrateur. Sans ce code, les inscriptions sont fermées.
+
+Le mot de passe doit faire au moins 12 caractères et mêler majuscule, minuscule et chiffre. Vous restez connecté 7 jours ; le bouton de déconnexion se trouve en haut à droite.
+
+> Vos actions sont tracées à votre nom dans le journal d'audit. Ne partagez pas votre compte.
+
 ### Étape 1 — Déclarer un compte
 
 Écran **Connexions** → bouton **Ajouter une connexion**.
@@ -298,7 +309,7 @@ Les écrans Ordres et Historique n'affichent que les entrées les plus récentes
 
 Points à connaître avant d'engager de l'argent réel.
 
-1. **Aucune authentification.** Il n'y a pas de compte utilisateur ni de mot de passe. Toute personne ayant accès à l'adresse du site peut tout consulter et tout modifier. Le journal d'audit attribue les actions à un utilisateur unique et fixe. C'est la limite la plus sérieuse.
+1. **Aucun écran d'administration des comptes.** Les nouveaux utilisateurs s'inscrivent avec un code d'invitation ; changer le rôle de quelqu'un demande une intervention technique.
 2. **Un seul courtier branché.** Seul Alpaca dispose d'un connecteur. Toute autre connexion reste simulée, quel que soit l'environnement choisi.
 3. **Les prix affichés sont simulés.** La valorisation des positions et le P&L reposent sur une variation aléatoire, pas sur une source de cotation réelle. Ils servent à valider vos règles, pas à mesurer une performance.
 4. **Les exécutions partielles** sont affichées mais le reliquat n'est pas suivi séparément.
@@ -339,3 +350,12 @@ Le seuil « Plage horaire autorisée » est actif par défaut sur 09:30–16:00 
 
 **Un ordre est passé en « En attente » alors que mon abonnement est automatique.**
 C'est le seuil « Validation manuelle au-delà de » qui s'est appliqué : le montant dépassait la limite. Approuvez-le, ou relevez le seuil.
+
+**Je suis renvoyé vers l'écran de connexion en pleine session.**
+Votre session a expiré (7 jours) ou a été fermée ailleurs. Reconnectez-vous : aucune donnée n'est perdue.
+
+**Un collègue n'arrive pas à s'inscrire.**
+Les inscriptions exigent un code d'invitation dès qu'un compte existe. Transmettez-lui celui fourni par votre administrateur.
+
+**Je ne peux rien modifier, tous les boutons échouent.**
+Votre compte est probablement en rôle « lecture », qui autorise la consultation mais aucune modification. Demandez un changement de rôle.

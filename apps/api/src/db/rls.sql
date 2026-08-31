@@ -15,6 +15,8 @@ ALTER TABLE public.notifications     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.settings          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.processed_signals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.realized_trades   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.users             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sessions          ENABLE ROW LEVEL SECURITY;
 
 -- Retire aussi les privilèges par défaut accordés par Supabase aux rôles publics.
 DO $$
@@ -33,6 +35,10 @@ $$;
 
 COMMENT ON COLUMN public.strategies.webhook_secret IS
   'Secret HMAC du webhook : ne doit jamais être exposé publiquement.';
+COMMENT ON COLUMN public.users.password_hash IS
+  'Empreinte scrypt du mot de passe : jamais exposée par l''API.';
+COMMENT ON COLUMN public.sessions.token_hash IS
+  'Empreinte SHA-256 du jeton de session : le jeton brut ne vit que dans le cookie.';
 COMMENT ON COLUMN public.connections.api_key_cipher IS
   'Clé API courtier chiffrée en AES-256-GCM par l''API.';
 COMMENT ON COLUMN public.connections.api_secret_cipher IS

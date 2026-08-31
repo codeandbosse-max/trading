@@ -15,8 +15,10 @@ import type {
   RiskRule,
   StrategyPayload,
   SubscriptionPayload,
+  User,
 } from '@trading/shared';
-import { api } from '@/lib/api';
+import { useRouter } from 'next/navigation';
+import { api, ApiError } from '@/lib/api';
 import { signPayload } from '@/lib/hmac';
 
 const DEFAULT_LIMITS = { orders: 200, signalLogs: 200, auditLogs: 300 };
@@ -38,10 +40,13 @@ const EMPTY_STATE: AppState = {
 
 interface StoreApi {
   state: AppState;
+  user: User | null;
   hydrated: boolean;
   offline: boolean;
   liveFeed: boolean;
+  readOnly: boolean;
   refresh: () => Promise<void>;
+  logout: () => Promise<void>;
   createStrategy: (input: StrategyPayload) => Promise<void>;
   updateStrategy: (id: string, input: StrategyPayload) => Promise<void>;
   deleteStrategy: (id: string) => Promise<void>;
@@ -74,7 +79,9 @@ interface StoreApi {
 const StoreContext = createContext<StoreApi | null>(null);
 
 export function StoreProvider({ children }: { children: React.ReactNode }) {
+  const router = useRouter();
   const [state, setState] = useState<AppState>(EMPTY_STATE);
+  const [user, setUser] = useState<User | null>(null);
   const [hydrated, setHydrated] = useState(false);
   const [offline, setOffline] = useState(false);
   const [liveFeed, setLiveFeed] = useState(false);
@@ -85,13 +92,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const next = await api.getState();
+      const [me, next] = await Promise.all([api.me(), api.getState()]);
       const limits = limitsRef.current;
       const [orders, signalLogs, auditLogs] = await Promise.all([
         limits.orders > DEFAULT_LIMITS.orders ? api.getOrders(limits.orders) : null,
         limits.signalLogs > DEFAULT_LIMITS.signalLogs ? api.getSignalLogs(limits.signalLogs) : null,
         limits.auditLogs > DEFAULT_LIMITS.auditLogs ? api.getAuditLogs(limits.auditLogs) : null,
       ]);
+      setUser(me);
       setState({
         ...next,
         orders: orders?.items ?? next.orders,
@@ -99,12 +107,23 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
         auditLogs: auditLogs?.items ?? next.auditLogs,
       });
       setOffline(false);
-    } catch {
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setUser(null);
+        router.replace('/login');
+        return;
+      }
       setOffline(true);
     } finally {
       setHydrated(true);
     }
-  }, []);
+  }, [router]);
+
+  const logout = useCallback(async () => {
+    await api.logout().catch(() => undefined);
+    setUser(null);
+    router.replace('/login');
+  }, [router]);
 
   const loadMore = useCallback(
     async (kind: 'orders' | 'signalLogs' | 'auditLogs') => {
@@ -153,10 +172,13 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const value = useMemo<StoreApi>(
     () => ({
       state,
+      user,
       hydrated,
       offline,
       liveFeed,
+      readOnly: user?.role === 'lecture',
       refresh,
+      logout,
       createStrategy: (input) => run(() => api.createStrategy(input)),
       updateStrategy: (id, input) => run(() => api.updateStrategy(id, input)),
       deleteStrategy: (id) => run(() => api.deleteStrategy(id)),
@@ -186,7 +208,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       markAllNotificationsRead: () => run(() => api.markAllNotificationsRead()),
       loadMore,
     }),
-    [state, hydrated, offline, liveFeed, refresh, run, simulateSignal, loadMore]
+    [state, user, hydrated, offline, liveFeed, refresh, logout, run, simulateSignal, loadMore]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

@@ -3,10 +3,24 @@
 import { useState } from 'react';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { Topbar } from '@/components/dashboard/topbar';
-import { StoreProvider } from '@/lib/store';
+import { StoreProvider, useStore } from '@/lib/store';
 import { Toaster } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
-import { X } from 'lucide-react';
+import { X, Loader2 } from 'lucide-react';
+
+/** Blocks the dashboard until the session is confirmed by the API. */
+function AuthGate({ children }: { children: React.ReactNode }) {
+  const { hydrated, user } = useStore();
+
+  if (!hydrated || !user) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+  return <>{children}</>;
+}
 
 export default function DashboardLayout({
   children,
@@ -17,6 +31,7 @@ export default function DashboardLayout({
 
   return (
     <StoreProvider>
+    <AuthGate>
     <div className="flex h-screen overflow-hidden bg-background">
       {/* Desktop sidebar */}
       <div className="hidden md:block">
@@ -52,6 +67,7 @@ export default function DashboardLayout({
       </div>
       <Toaster />
     </div>
+    </AuthGate>
     </StoreProvider>
   );
 }

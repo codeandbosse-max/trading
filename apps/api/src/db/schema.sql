@@ -1,3 +1,20 @@
+CREATE TABLE IF NOT EXISTS users (
+  id            text PRIMARY KEY,
+  email         text NOT NULL UNIQUE,
+  name          text NOT NULL,
+  password_hash text NOT NULL,
+  role          text NOT NULL DEFAULT 'operateur',
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id         text PRIMARY KEY,
+  user_id    text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash text NOT NULL UNIQUE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS strategies (
   id                   text PRIMARY KEY,
   name                 text NOT NULL,
@@ -155,3 +172,4 @@ CREATE INDEX IF NOT EXISTS idx_signal_logs_received_at ON signal_logs (received_
 CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs (timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_strategy ON subscriptions (strategy_id);
 CREATE INDEX IF NOT EXISTS idx_realized_trades_closed_at ON realized_trades (closed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions (user_id);

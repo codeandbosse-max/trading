@@ -8,6 +8,7 @@ import { runExecutionTick } from '../services/execution';
 import { riskRuleTests } from './risk-rules';
 import { brokerTests } from './brokers';
 import { alertTests } from './alerts';
+import { authTests } from './auth';
 
 let failures = 0;
 
@@ -45,8 +46,25 @@ async function main(): Promise<void> {
   const port = typeof address === 'object' && address ? address.port : 0;
   const base = `http://127.0.0.1:${port}`;
 
+  console.log('--- Authentification ---');
+  await authTests(check, base, server);
+
+  // Every protected call below reuses this session.
+  const loginRes = await fetch(`${base}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: 'admin@exemple.fr', password: 'MotDePasse123456' }),
+  });
+  const sessionCookie = (loginRes.headers.get('set-cookie') ?? '').split(';')[0];
+  check('session de test établie', sessionCookie.length > 0, sessionCookie);
+
+  console.log('\n--- Parcours métier ---');
+
   const json = async (path: string, init?: RequestInit) => {
-    const res = await fetch(`${base}${path}`, init);
+    const res = await fetch(`${base}${path}`, {
+      ...init,
+      headers: { ...(init?.headers ?? {}), cookie: sessionCookie },
+    });
     const text = await res.text();
     return { status: res.status, body: text ? JSON.parse(text) : null };
   };

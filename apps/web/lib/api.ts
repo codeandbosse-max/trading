@@ -3,14 +3,17 @@ import type {
   AuditLog,
   Connection,
   ConnectionFormOutput,
+  LoginPayload,
   Order,
   Page,
+  RegisterPayload,
   RiskRule,
   SignalLog,
   Strategy,
   StrategyPayload,
   Subscription,
   SubscriptionPayload,
+  User,
 } from '@trading/shared';
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -32,6 +35,8 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
       ...init?.headers,
     },
+    // The session lives in an httpOnly cookie set by the API.
+    credentials: 'include',
     cache: 'no-store',
   });
 
@@ -48,6 +53,15 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   getState: () => request<AppState>('/api/state'),
+
+  authStatus: () =>
+    request<{ bootstrap: boolean; signupCodeRequired: boolean }>('/api/auth/status'),
+  me: () => request<User>('/api/auth/me'),
+  register: (input: RegisterPayload) =>
+    request<User>('/api/auth/register', { method: 'POST', body: JSON.stringify(input) }),
+  login: (input: LoginPayload) =>
+    request<User>('/api/auth/login', { method: 'POST', body: JSON.stringify(input) }),
+  logout: () => request<void>('/api/auth/logout', { method: 'POST' }),
 
   getOrders: (limit: number) => request<Page<Order>>(`/api/orders?limit=${limit}`),
   getSignalLogs: (limit: number) => request<Page<SignalLog>>(`/api/signal-logs?limit=${limit}`),

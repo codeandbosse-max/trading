@@ -1,4 +1,4 @@
-import { Router } from 'express';
+﻿import { Router } from 'express';
 import {
   connectionInputSchema,
   connectionFormSchema,
@@ -9,6 +9,7 @@ import {
   subscriptionInputSchema,
 } from '@trading/shared';
 import { getDb } from '../db/pool';
+import { config } from '../config';
 import { encrypt, newWebhookId, newWebhookSecret, uid } from '../lib/crypto';
 import {
   countRows,
@@ -39,6 +40,7 @@ import { asyncHandler, HttpError } from '../middleware/errors';
 export const router = Router();
 
 const clientIp = (req: { ip?: string }): string => req.ip ?? '-';
+const actorOf = (req: { user?: { email: string } }): string => req.user?.email ?? config.actor;
 
 function pageParams(query: Record<string, unknown>, defaultLimit: number) {
   const limit = Math.min(Math.max(Number.parseInt(String(query.limit ?? defaultLimit), 10) || defaultLimit, 1), 500);
@@ -135,7 +137,7 @@ router.post(
         input.defaultOrderType,
       ]
     );
-    await recordAudit('strategie.creation', input.name, 'info', clientIp(req));
+    await recordAudit('strategie.creation', input.name, 'info', clientIp(req), actorOf(req));
     res.status(201).json(mapStrategy(rows[0]));
   })
 );
@@ -165,8 +167,8 @@ router.put(
         input.defaultOrderType,
       ]
     );
-    if (!rows[0]) throw new HttpError(404, 'Stratégie introuvable.');
-    await recordAudit('strategie.modification', input.name, 'info', clientIp(req));
+    if (!rows[0]) throw new HttpError(404, 'StratÃ©gie introuvable.');
+    await recordAudit('strategie.modification', input.name, 'info', clientIp(req), actorOf(req));
     res.json(mapStrategy(rows[0]));
   })
 );
@@ -175,9 +177,9 @@ router.delete(
   '/strategies/:id',
   asyncHandler(async (req, res) => {
     const strategy = await findStrategy(req.params.id);
-    if (!strategy) throw new HttpError(404, 'Stratégie introuvable.');
+    if (!strategy) throw new HttpError(404, 'StratÃ©gie introuvable.');
     await getDb().query(`DELETE FROM strategies WHERE id = $1`, [req.params.id]);
-    await recordAudit('strategie.suppression', strategy.name, 'warning', clientIp(req));
+    await recordAudit('strategie.suppression', strategy.name, 'warning', clientIp(req), actorOf(req));
     res.status(204).end();
   })
 );
@@ -190,8 +192,8 @@ router.post(
       `UPDATE strategies SET webhook_secret = $2 WHERE id = $1 RETURNING *`,
       [req.params.id, secret]
     );
-    if (!rows[0]) throw new HttpError(404, 'Stratégie introuvable.');
-    await recordAudit('webhook.rotation_secret', rows[0].name, 'warning', clientIp(req));
+    if (!rows[0]) throw new HttpError(404, 'StratÃ©gie introuvable.');
+    await recordAudit('webhook.rotation_secret', rows[0].name, 'warning', clientIp(req), actorOf(req));
     res.json(mapStrategy(rows[0]));
   })
 );
@@ -226,7 +228,7 @@ router.post(
         encrypt(input.apiSecret),
       ]
     );
-    await recordAudit('connexion.creation', input.name, 'info', clientIp(req));
+    await recordAudit('connexion.creation', input.name, 'info', clientIp(req), actorOf(req));
     res.status(201).json(mapConnection(rows[0]));
   })
 );
@@ -252,7 +254,7 @@ router.put(
       ]
     );
     if (!rows[0]) throw new HttpError(404, 'Connexion introuvable.');
-    await recordAudit('connexion.modification', input.name, 'info', clientIp(req));
+    await recordAudit('connexion.modification', input.name, 'info', clientIp(req), actorOf(req));
     res.json(mapConnection(rows[0]));
   })
 );
@@ -263,7 +265,7 @@ router.delete(
     const connection = await findConnection(req.params.id);
     if (!connection) throw new HttpError(404, 'Connexion introuvable.');
     await getDb().query(`DELETE FROM connections WHERE id = $1`, [req.params.id]);
-    await recordAudit('connexion.suppression', connection.name, 'warning', clientIp(req));
+    await recordAudit('connexion.suppression', connection.name, 'warning', clientIp(req), actorOf(req));
     res.status(204).end();
   })
 );
@@ -280,16 +282,16 @@ router.post(
     );
     await recordAudit(
       'connexion.test',
-      `${connection.name} → ${reachable ? 'actif' : 'expire'}`,
+      `${connection.name} â†’ ${reachable ? 'actif' : 'expire'}`,
       reachable ? 'info' : 'warning',
       clientIp(req)
     );
     await pushNotification({
       type: 'connexion',
-      title: reachable ? 'Connexion opérationnelle' : 'Échec du test',
+      title: reachable ? 'Connexion opÃ©rationnelle' : 'Ã‰chec du test',
       message: reachable
-        ? `${connection.name} a répondu correctement.`
-        : `${connection.name} : identifiants expirés, renouvelez la clé API.`,
+        ? `${connection.name} a rÃ©pondu correctement.`
+        : `${connection.name} : identifiants expirÃ©s, renouvelez la clÃ© API.`,
       severity: reachable ? 'success' : 'error',
     });
     res.json({ reachable, connection: mapConnection(rows[0]) });
@@ -307,7 +309,7 @@ router.post(
     if (!rows[0]) throw new HttpError(404, 'Connexion introuvable.');
     await recordAudit(
       'connexion.changement_etat',
-      `${rows[0].name} → ${enabled ? 'actif' : 'indisponible'}`,
+      `${rows[0].name} â†’ ${enabled ? 'actif' : 'indisponible'}`,
       'warning',
       clientIp(req)
     );
@@ -345,7 +347,7 @@ router.post(
         input.tickerOverride ?? null,
       ]
     );
-    await recordAudit('abonnement.creation', rows[0].id, 'info', clientIp(req));
+    await recordAudit('abonnement.creation', rows[0].id, 'info', clientIp(req), actorOf(req));
     res.status(201).json(mapSubscription(rows[0]));
   })
 );
@@ -374,7 +376,7 @@ router.put(
       ]
     );
     if (!rows[0]) throw new HttpError(404, 'Abonnement introuvable.');
-    await recordAudit('abonnement.modification', req.params.id, 'info', clientIp(req));
+    await recordAudit('abonnement.modification', req.params.id, 'info', clientIp(req), actorOf(req));
     res.json(mapSubscription(rows[0]));
   })
 );
@@ -383,7 +385,7 @@ router.delete(
   '/subscriptions/:id',
   asyncHandler(async (req, res) => {
     await getDb().query(`DELETE FROM subscriptions WHERE id = $1`, [req.params.id]);
-    await recordAudit('abonnement.suppression', req.params.id, 'warning', clientIp(req));
+    await recordAudit('abonnement.suppression', req.params.id, 'warning', clientIp(req), actorOf(req));
     res.status(204).end();
   })
 );
@@ -413,7 +415,7 @@ router.post(
     const order = await findOrder(req.params.id);
     if (!order) throw new HttpError(404, 'Ordre introuvable.');
     if (order.status === 'execute') {
-      throw new HttpError(409, 'Un ordre exécuté ne peut plus être modifié.');
+      throw new HttpError(409, 'Un ordre exÃ©cutÃ© ne peut plus Ãªtre modifiÃ©.');
     }
 
     const target = transitions[action];
@@ -457,7 +459,7 @@ router.delete(
       quantity: position.qty,
       pnl: position.pnl,
     });
-    await recordAudit('position.cloture', position.ticker, 'info', clientIp(req));
+    await recordAudit('position.cloture', position.ticker, 'info', clientIp(req), actorOf(req));
     res.status(204).end();
   })
 );
@@ -477,8 +479,8 @@ router.put(
       `UPDATE risk_rules SET value = $2, enabled = $3 WHERE id = $1 RETURNING *`,
       [req.params.id, input.value, input.enabled]
     );
-    if (!rows[0]) throw new HttpError(404, 'Règle introuvable.');
-    await recordAudit('risque.regle_modifiee', rows[0].label, 'info', clientIp(req));
+    if (!rows[0]) throw new HttpError(404, 'RÃ¨gle introuvable.');
+    await recordAudit('risque.regle_modifiee', rows[0].label, 'info', clientIp(req), actorOf(req));
     res.json(mapRiskRule(rows[0]));
   })
 );
@@ -501,10 +503,10 @@ router.post(
     );
     await pushNotification({
       type: 'risque',
-      title: active ? 'Coupe-circuit activé' : 'Coupe-circuit désactivé',
+      title: active ? 'Coupe-circuit activÃ©' : 'Coupe-circuit dÃ©sactivÃ©',
       message: active
-        ? 'Toutes les exécutions sont suspendues jusqu’à réarmement.'
-        : 'Les exécutions reprennent normalement.',
+        ? 'Toutes les exÃ©cutions sont suspendues jusquâ€™Ã  rÃ©armement.'
+        : 'Les exÃ©cutions reprennent normalement.',
       severity: active ? 'error' : 'success',
     });
     res.json({ active });

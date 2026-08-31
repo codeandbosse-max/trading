@@ -104,6 +104,32 @@ export const orderActionSchema = z.object({
   reason: z.string().trim().max(200).optional(),
 });
 
+export const userRoles = ['admin', 'operateur', 'lecture'] as const;
+
+export const registerSchema = z.object({
+  email: z.string().trim().toLowerCase().email('Adresse e-mail invalide.').max(160),
+  name: z.string().trim().min(2, 'Indiquez un nom d’au moins 2 caractères.').max(80),
+  password: z
+    .string()
+    .min(12, 'Le mot de passe doit contenir au moins 12 caractères.')
+    .max(200)
+    .refine((v) => /[a-z]/.test(v) && /[A-Z]/.test(v) && /\d/.test(v), {
+      message: 'Utilisez au moins une minuscule, une majuscule et un chiffre.',
+    }),
+  signupCode: z.string().trim().max(200).optional(),
+});
+
+export type RegisterInput = z.input<typeof registerSchema>;
+export type RegisterPayload = z.output<typeof registerSchema>;
+
+export const loginSchema = z.object({
+  email: z.string().trim().toLowerCase().email('Adresse e-mail invalide.').max(160),
+  password: z.string().min(1, 'Mot de passe requis.').max(200),
+});
+
+export type LoginInput = z.input<typeof loginSchema>;
+export type LoginPayload = z.output<typeof loginSchema>;
+
 /** Payload accepted by the public webhook ingestion endpoint. */
 export const webhookPayloadSchema = z.object({
   signalId: z.string().trim().min(1).max(100).optional(),

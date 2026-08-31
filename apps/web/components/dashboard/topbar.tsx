@@ -15,6 +15,7 @@ import {
   Plug,
   Wallet,
   CheckCheck,
+  LogOut,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,7 +42,7 @@ const severityColor: Record<string, string> = {
 export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
   const { theme, toggle } = useTheme();
   const router = useRouter();
-  const { state, markNotificationRead, markAllNotificationsRead } = useStore();
+  const { state, markNotificationRead, markAllNotificationsRead, user, logout } = useStore();
   const [notifOpen, setNotifOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const notifications = state.notifications;
@@ -182,13 +183,28 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
 
         <div className="flex items-center gap-2 rounded-lg border border-border px-2.5 py-1.5">
           <div className="flex h-7 w-7 items-center justify-center rounded-full bg-accent text-xs font-bold text-accent-foreground">
-            AM
+            {(user?.name ?? '?')
+              .split(' ')
+              .map((part) => part[0])
+              .slice(0, 2)
+              .join('')
+              .toUpperCase()}
           </div>
           <div className="hidden flex-col leading-tight sm:flex">
-            <span className="text-xs font-medium">Alex Moreau</span>
-            <span className="text-[11px] text-muted-foreground">Administrateur</span>
+            <span className="text-xs font-medium">{user?.name ?? '—'}</span>
+            <span className="text-[11px] capitalize text-muted-foreground">
+              {user?.role ?? ''}
+            </span>
           </div>
-          <ChevronDown className="hidden h-4 w-4 text-muted-foreground sm:block" />
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-7 w-7 text-muted-foreground"
+            onClick={() => void logout()}
+            aria-label="Se déconnecter"
+          >
+            <LogOut className="h-4 w-4" />
+          </Button>
         </div>
       </div>
 

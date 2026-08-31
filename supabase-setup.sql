@@ -8,6 +8,23 @@
 --   DATABASE_URL="postgresql://..." DATABASE_SSL=true npm run db:seed
 -- =====================================================================
 
+CREATE TABLE IF NOT EXISTS users (
+  id            text PRIMARY KEY,
+  email         text NOT NULL UNIQUE,
+  name          text NOT NULL,
+  password_hash text NOT NULL,
+  role          text NOT NULL DEFAULT 'operateur',
+  created_at    timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+  id         text PRIMARY KEY,
+  user_id    text NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  token_hash text NOT NULL UNIQUE,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS strategies (
   id                   text PRIMARY KEY,
   name                 text NOT NULL,
@@ -165,6 +182,7 @@ CREATE INDEX IF NOT EXISTS idx_signal_logs_received_at ON signal_logs (received_
 CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs (timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_strategy ON subscriptions (strategy_id);
 CREATE INDEX IF NOT EXISTS idx_realized_trades_closed_at ON realized_trades (closed_at DESC);
+CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions (user_id);
 
 -- Durcissement destiné à Supabase.
 -- L'API se connecte avec le rôle propriétaire (postgres) et n'est donc pas
@@ -183,6 +201,8 @@ ALTER TABLE public.notifications     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.settings          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.processed_signals ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.realized_trades   ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.users             ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.sessions          ENABLE ROW LEVEL SECURITY;
 
 -- Retire aussi les privilèges par défaut accordés par Supabase aux rôles publics.
 DO $$
@@ -201,6 +221,10 @@ $$;
 
 COMMENT ON COLUMN public.strategies.webhook_secret IS
   'Secret HMAC du webhook : ne doit jamais être exposé publiquement.';
+COMMENT ON COLUMN public.users.password_hash IS
+  'Empreinte scrypt du mot de passe : jamais exposée par l''API.';
+COMMENT ON COLUMN public.sessions.token_hash IS
+  'Empreinte SHA-256 du jeton de session : le jeton brut ne vit que dans le cookie.';
 COMMENT ON COLUMN public.connections.api_key_cipher IS
   'Clé API courtier chiffrée en AES-256-GCM par l''API.';
 COMMENT ON COLUMN public.connections.api_secret_cipher IS

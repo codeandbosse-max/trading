@@ -80,6 +80,9 @@ Copiez `.env.example` vers `apps/api/.env` et `apps/web/.env.local`.
 | `ALERT_WEBHOOK_URL` | non | Webhook générique recevant la notification en JSON. |
 | `CHAT_WEBHOOK_URL` | non | Webhook entrant Slack ou Discord. |
 | `SMTP_URL` / `ALERT_EMAIL_FROM` / `ALERT_EMAIL_TO` | non | Alertes par e-mail. |
+| `SIGNUP_CODE` | non | Code d'invitation exigé après le premier compte. Vide = inscriptions fermées. |
+| `COOKIE_SAMESITE` | cross-domaine | `lax` (défaut), `none` ou `strict`. |
+| `COOKIE_SECURE` | production | `true` pour n'émettre le cookie qu'en HTTPS. |
 
 > **Attention.** Changer `ENCRYPTION_KEY` rend illisibles tous les identifiants courtiers déjà enregistrés.
 
@@ -119,7 +122,7 @@ npm run db:seed
 | `npm run build` | Construit les trois paquets. |
 | `npm run typecheck` | Vérifie les types sur tout le monorepo. |
 | `npm run lint` | ESLint. |
-| `npm test` | Suite de tests du back (92 assertions, base SQL en mémoire). |
+| `npm test` | Suite de tests du back (121 assertions, base SQL en mémoire). |
 | `npm run db:migrate` / `db:seed` / `db:harden` | Schéma / données / durcissement RLS. |
 | `npm run db:script` | Régénère `supabase-setup.sql`. |
 
@@ -522,6 +525,8 @@ Base : `{API_URL}/api`.
 | `GET` `POST` | `/tasks/tick` | Traitement planifié (`Authorization: Bearer {CRON_SECRET}`). |
 | `GET` | `/health` | Sonde de disponibilité (hors `/api`). |
 
+Toutes les routes `/api` autres que `/api/auth/*`, `/api/webhook/*` et `/api/tasks/*` exigent une session valide.
+
 Erreurs : `{ "error": "message" }`, avec `details` en cas de `422`.
 
 ---
@@ -542,9 +547,24 @@ Erreurs : `{ "error": "message" }`, avec `details` en cas de `422`.
 
 **Ce qui n'est pas en place**
 
-> **L'API n'a aucune authentification.** Toute personne connaissant son URL peut lire l'état complet, créer des stratégies, basculer le coupe-circuit et supprimer des données. `CORS_ORIGINS` ne protège que les navigateurs, pas un appel `curl`. **N'exposez pas l'API sur Internet sans ajouter une authentification**, a fortiori avec `ALLOW_LIVE_TRADING=true`.
+> Il n'existe pas encore d'écran d'administration des comptes : la création passe par le code d'invitation, et le changement de rôle par une mise à jour directe en base.
 
-Le tableau de bord n'a pas non plus de connexion : l'utilisateur affiché est codé en dur.
+### Authentification
+
+| Route | Rôle |
+|---|---|
+| `GET /api/auth/status` | Indique si le premier compte reste à créer. |
+| `POST /api/auth/register` | Inscription. |
+| `POST /api/auth/login` | Connexion. |
+| `POST /api/auth/logout` | Déconnexion, révoque la session. |
+| `GET /api/auth/me` | Compte courant. |
+
+- **Mots de passe** : 12 caractères minimum avec majuscule, minuscule et chiffre, hachés en **scrypt** (coût 16384, sel aléatoire par compte).
+- **Sessions** : jeton de 32 octets en cookie `httpOnly`, valable 7 jours. Seule son empreinte SHA-256 est stockée : une fuite de la base ne livre aucune session utilisable.
+- **Amorçage** : le premier compte créé devient `admin`. Ensuite, l'inscription exige `SIGNUP_CODE` ; sans ce code, les inscriptions sont fermées.
+- **Rôles** : `admin`, `operateur`, `lecture`. Un compte `lecture` ne peut exécuter aucune requête autre que `GET`.
+- **Anti-énumération** : la vérification du mot de passe s'exécute même pour un compte inexistant, et le message d'erreur est identique.
+- **Routes publiques** : `/health` et `/api/webhook/:id` (protégée par HMAC), plus `/api/tasks/tick` (protégée par `CRON_SECRET`).
 
 ### Alertes externes
 
@@ -603,7 +623,7 @@ Toutes les données vivent dans PostgreSQL. Une sauvegarde de la base suffit. Co
 
 À lire avant tout usage réel.
 
-1. **Aucune authentification** sur l'API ni sur le tableau de bord (voir [Sécurité](#11-sécurité)). C'est la limite la plus critique.
+1. **Aucun écran d'administration des comptes.** Création par code d'invitation uniquement ; les rôles se modifient directement en base.
 2. **Un seul adaptateur courtier.** Seul Alpaca est implémenté ; toute autre connexion retombe sur la place simulée. Le routage réel n'a pas été validé contre l'API Alpaca de production, uniquement contre un serveur de test reproduisant son contrat.
 3. **Les prix de marché sont simulés.** La revalorisation des positions applique une dérive aléatoire : aucune source de cotation réelle n'est branchée, y compris pour les positions ouvertes chez un vrai courtier.
 4. **Les exécutions partielles ne sont pas suivies dans la durée** : le statut `execute_partiellement` est enregistré mais le solde restant n'est pas retracé séparément.

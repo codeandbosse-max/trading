@@ -43,6 +43,16 @@ export const config = {
   get riskTimeZone(): string {
     return process.env.RISK_TIMEZONE ?? 'America/New_York';
   },
+  get signupCode(): string {
+    return process.env.SIGNUP_CODE ?? '';
+  },
+  get cookieSecure(): boolean {
+    return (process.env.COOKIE_SECURE ?? String(isProduction)) === 'true';
+  },
+  get cookieSameSite(): 'lax' | 'none' | 'strict' {
+    const value = process.env.COOKIE_SAMESITE ?? 'lax';
+    return value === 'none' || value === 'strict' ? value : 'lax';
+  },
   get alerts() {
     return {
       minSeverity: process.env.ALERT_MIN_SEVERITY ?? 'warning',
