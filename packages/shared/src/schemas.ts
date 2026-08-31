@@ -111,6 +111,7 @@ export const webhookPayloadSchema = z.object({
   action: z.enum(signalActions),
   quantity: z.number().positive().max(1_000_000).optional(),
   price: z.number().positive().max(10_000_000).optional(),
+  stopLoss: z.number().positive().max(10_000_000).optional(),
   orderType: z.enum(orderTypes).optional(),
   source: z.string().trim().max(60).optional(),
   timestamp: z.string().trim().max(40).optional(),

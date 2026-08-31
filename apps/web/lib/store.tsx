@@ -19,6 +19,9 @@ import type {
 import { api } from '@/lib/api';
 import { signPayload } from '@/lib/hmac';
 
+const DEFAULT_LIMITS = { orders: 200, signalLogs: 200, auditLogs: 300 };
+const PAGE_STEP = 200;
+
 const EMPTY_STATE: AppState = {
   strategies: [],
   connections: [],
@@ -30,6 +33,7 @@ const EMPTY_STATE: AppState = {
   auditLogs: [],
   notifications: [],
   killSwitch: false,
+  counts: { orders: 0, signalLogs: 0, auditLogs: 0 },
 };
 
 interface StoreApi {
@@ -64,6 +68,7 @@ interface StoreApi {
   simulateSignal: () => Promise<void>;
   markNotificationRead: (id: string) => Promise<void>;
   markAllNotificationsRead: () => Promise<void>;
+  loadMore: (kind: 'orders' | 'signalLogs' | 'auditLogs') => Promise<void>;
 }
 
 const StoreContext = createContext<StoreApi | null>(null);
@@ -75,11 +80,24 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [liveFeed, setLiveFeed] = useState(false);
   const stateRef = useRef(state);
   stateRef.current = state;
+  // Pages already loaded must survive the polling refresh.
+  const limitsRef = useRef({ ...DEFAULT_LIMITS });
 
   const refresh = useCallback(async () => {
     try {
       const next = await api.getState();
-      setState(next);
+      const limits = limitsRef.current;
+      const [orders, signalLogs, auditLogs] = await Promise.all([
+        limits.orders > DEFAULT_LIMITS.orders ? api.getOrders(limits.orders) : null,
+        limits.signalLogs > DEFAULT_LIMITS.signalLogs ? api.getSignalLogs(limits.signalLogs) : null,
+        limits.auditLogs > DEFAULT_LIMITS.auditLogs ? api.getAuditLogs(limits.auditLogs) : null,
+      ]);
+      setState({
+        ...next,
+        orders: orders?.items ?? next.orders,
+        signalLogs: signalLogs?.items ?? next.signalLogs,
+        auditLogs: auditLogs?.items ?? next.auditLogs,
+      });
       setOffline(false);
     } catch {
       setOffline(true);
@@ -87,6 +105,14 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       setHydrated(true);
     }
   }, []);
+
+  const loadMore = useCallback(
+    async (kind: 'orders' | 'signalLogs' | 'auditLogs') => {
+      limitsRef.current[kind] += PAGE_STEP;
+      await refresh();
+    },
+    [refresh]
+  );
 
   useEffect(() => {
     void refresh();
@@ -158,8 +184,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       simulateSignal,
       markNotificationRead: (id) => run(() => api.markNotificationRead(id)),
       markAllNotificationsRead: () => run(() => api.markAllNotificationsRead()),
+      loadMore,
     }),
-    [state, hydrated, offline, liveFeed, refresh, run, simulateSignal]
+    [state, hydrated, offline, liveFeed, refresh, run, simulateSignal, loadMore]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;

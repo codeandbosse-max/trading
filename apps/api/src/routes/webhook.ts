@@ -70,9 +70,11 @@ webhookRouter.post(
       action: payload.action,
       quantity: payload.quantity,
       price: payload.price,
+      stopLoss: payload.stopLoss,
       orderType: payload.orderType,
       source: payload.source ?? 'Webhook externe',
       receivedAt: new Date().toISOString(),
+      emittedAt: payload.timestamp,
     };
 
     const result = await processSignal(signal);

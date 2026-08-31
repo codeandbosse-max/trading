@@ -11,6 +11,7 @@ import {
 import { getDb } from '../db/pool';
 import { encrypt, newWebhookId, newWebhookSecret, uid } from '../lib/crypto';
 import {
+  countRows,
   findConnection,
   findOrder,
   findStrategy,
@@ -29,6 +30,7 @@ import {
   mapRiskRule,
   mapStrategy,
   mapSubscription,
+  recordRealizedTrade,
 } from '../repositories/queries';
 import { pushNotification, recordAudit } from '../services/journal';
 import { maybeRunTick } from '../services/scheduler';
@@ -37,6 +39,12 @@ import { asyncHandler, HttpError } from '../middleware/errors';
 export const router = Router();
 
 const clientIp = (req: { ip?: string }): string => req.ip ?? '-';
+
+function pageParams(query: Record<string, unknown>, defaultLimit: number) {
+  const limit = Math.min(Math.max(Number.parseInt(String(query.limit ?? defaultLimit), 10) || defaultLimit, 1), 500);
+  const offset = Math.max(Number.parseInt(String(query.offset ?? 0), 10) || 0, 0);
+  return { limit, offset };
+}
 
 router.get(
   '/state',
@@ -54,6 +62,9 @@ router.get(
       auditLogs,
       notifications,
       killSwitch,
+      ordersTotal,
+      signalLogsTotal,
+      auditLogsTotal,
     ] = await Promise.all([
       listStrategies(),
       listConnections(),
@@ -65,6 +76,9 @@ router.get(
       listAuditLogs(),
       listNotifications(),
       getKillSwitch(),
+      countRows('orders'),
+      countRows('signal_logs'),
+      countRows('audit_logs'),
     ]);
     res.json({
       strategies,
@@ -77,6 +91,11 @@ router.get(
       auditLogs,
       notifications,
       killSwitch,
+      counts: {
+        orders: ordersTotal,
+        signalLogs: signalLogsTotal,
+        auditLogs: auditLogsTotal,
+      },
     });
   })
 );
@@ -373,7 +392,11 @@ router.delete(
 
 router.get(
   '/orders',
-  asyncHandler(async (_req, res) => res.json(await listOrders()))
+  asyncHandler(async (req, res) => {
+    const { limit, offset } = pageParams(req.query, 200);
+    const [items, total] = await Promise.all([listOrders(limit, offset), countRows('orders')]);
+    res.json({ items, total, limit, offset });
+  })
 );
 
 const transitions: Record<string, { status: string; audit: string }> = {
@@ -422,12 +445,19 @@ router.get(
 router.delete(
   '/positions/:id',
   asyncHandler(async (req, res) => {
-    const { rows } = await getDb().query(
-      `DELETE FROM positions WHERE id = $1 RETURNING ticker`,
-      [req.params.id]
-    );
-    if (!rows[0]) throw new HttpError(404, 'Position introuvable.');
-    await recordAudit('position.cloture', rows[0].ticker, 'info', clientIp(req));
+    const positions = await listPositions();
+    const position = positions.find((p) => p.id === req.params.id);
+    if (!position) throw new HttpError(404, 'Position introuvable.');
+
+    await getDb().query(`DELETE FROM positions WHERE id = $1`, [req.params.id]);
+    await recordRealizedTrade({
+      id: uid('trade'),
+      ticker: position.ticker,
+      connectionName: position.connectionName,
+      quantity: position.qty,
+      pnl: position.pnl,
+    });
+    await recordAudit('position.cloture', position.ticker, 'info', clientIp(req));
     res.status(204).end();
   })
 );
@@ -485,12 +515,26 @@ router.post(
 
 router.get(
   '/audit-logs',
-  asyncHandler(async (_req, res) => res.json(await listAuditLogs()))
+  asyncHandler(async (req, res) => {
+    const { limit, offset } = pageParams(req.query, 300);
+    const [items, total] = await Promise.all([
+      listAuditLogs(limit, offset),
+      countRows('audit_logs'),
+    ]);
+    res.json({ items, total, limit, offset });
+  })
 );
 
 router.get(
   '/signal-logs',
-  asyncHandler(async (_req, res) => res.json(await listSignalLogs()))
+  asyncHandler(async (req, res) => {
+    const { limit, offset } = pageParams(req.query, 200);
+    const [items, total] = await Promise.all([
+      listSignalLogs(limit, offset),
+      countRows('signal_logs'),
+    ]);
+    res.json({ items, total, limit, offset });
+  })
 );
 
 router.get(

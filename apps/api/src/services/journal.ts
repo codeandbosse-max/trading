@@ -3,6 +3,7 @@ import { getDb } from '../db/pool';
 import { uid } from '../lib/crypto';
 import { config } from '../config';
 import { mapAuditLog, mapNotification } from '../repositories/queries';
+import { dispatchAlert } from './alerts';
 
 export async function recordAudit(
   action: string,
@@ -27,5 +28,7 @@ export async function pushNotification(
      VALUES ($1, $2, $3, $4, $5, now(), false) RETURNING *`,
     [uid('notif'), input.type, input.title, input.message, input.severity]
   );
-  return mapNotification(rows[0]);
+  const notification = mapNotification(rows[0]);
+  void dispatchAlert(notification);
+  return notification;
 }

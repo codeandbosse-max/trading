@@ -33,6 +33,26 @@ export const config = {
   get tickMinIntervalMs(): number {
     return Number.parseInt(process.env.TICK_MIN_INTERVAL_MS ?? '3000', 10);
   },
+  // Live order routing stays off unless explicitly enabled.
+  get allowLiveTrading(): boolean {
+    return process.env.ALLOW_LIVE_TRADING === 'true';
+  },
+  get alpacaBaseUrl(): string {
+    return process.env.ALPACA_BASE_URL ?? '';
+  },
+  get riskTimeZone(): string {
+    return process.env.RISK_TIMEZONE ?? 'America/New_York';
+  },
+  get alerts() {
+    return {
+      minSeverity: process.env.ALERT_MIN_SEVERITY ?? 'warning',
+      webhookUrl: process.env.ALERT_WEBHOOK_URL ?? '',
+      chatWebhookUrl: process.env.CHAT_WEBHOOK_URL ?? '',
+      smtpUrl: process.env.SMTP_URL ?? '',
+      emailFrom: process.env.ALERT_EMAIL_FROM ?? '',
+      emailTo: process.env.ALERT_EMAIL_TO ?? '',
+    };
+  },
   // Keep this at 1 behind a connection pooler (Supabase port 6543).
   dbPoolMax: Number.parseInt(process.env.DB_POOL_MAX ?? '10', 10),
 };

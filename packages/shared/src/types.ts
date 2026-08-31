@@ -97,6 +97,8 @@ export interface Order {
   receivedAt: string;
   submittedAt: string | null;
   executedAt: string | null;
+  /** Broker route that handled the order: 'simulation' or a real adapter. */
+  executionVenue: string;
 }
 
 export interface SignalLog {
@@ -170,6 +172,18 @@ export interface AppState {
   auditLogs: AuditLog[];
   notifications: NotificationItem[];
   killSwitch: boolean;
+  counts: {
+    orders: number;
+    signalLogs: number;
+    auditLogs: number;
+  };
+}
+
+export interface Page<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
 }
 
 export interface IncomingSignal {
@@ -179,9 +193,21 @@ export interface IncomingSignal {
   action: SignalAction;
   quantity?: number;
   price?: number;
+  stopLoss?: number;
   orderType?: string;
   source: string;
   receivedAt: string;
+  /** Timestamp declared by the emitter, used to measure signal staleness. */
+  emittedAt?: string;
+}
+
+export interface RealizedTrade {
+  id: string;
+  ticker: string;
+  connectionName: string;
+  quantity: number;
+  pnl: number;
+  closedAt: string;
 }
 
 export interface SignalResult {

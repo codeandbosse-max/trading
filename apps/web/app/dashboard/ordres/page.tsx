@@ -69,7 +69,7 @@ const statusFilters: { value: string; label: string }[] = [
 ];
 
 export default function OrdersPage() {
-  const { state, approveOrder, rejectOrder, cancelOrder, retryOrder } = useStore();
+  const { state, approveOrder, rejectOrder, cancelOrder, retryOrder, loadMore } = useStore();
   const orders = state.orders;
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -210,6 +210,16 @@ export default function OrdersPage() {
           {filtered.length === 0 && (
             <div className="py-12 text-center text-sm text-muted-foreground">
               Aucun ordre ne correspond à vos filtres.
+            </div>
+          )}
+          {orders.length < state.counts.orders && (
+            <div className="flex items-center justify-center gap-3 border-t border-border py-3 text-xs text-muted-foreground">
+              <span>
+                {orders.length} sur {state.counts.orders} ordres
+              </span>
+              <Button variant="outline" size="sm" onClick={() => void loadMore('orders')}>
+                Charger plus
+              </Button>
             </div>
           )}
         </CardContent>

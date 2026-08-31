@@ -69,7 +69,17 @@ CREATE TABLE IF NOT EXISTS orders (
   rejection_reason text,
   received_at      timestamptz NOT NULL DEFAULT now(),
   submitted_at     timestamptz,
-  executed_at      timestamptz
+  executed_at      timestamptz,
+  execution_venue  text NOT NULL DEFAULT 'simulation'
+);
+
+CREATE TABLE IF NOT EXISTS realized_trades (
+  id              text PRIMARY KEY,
+  ticker          text NOT NULL,
+  connection_name text NOT NULL,
+  quantity        double precision NOT NULL,
+  pnl             double precision NOT NULL,
+  closed_at       timestamptz NOT NULL DEFAULT now()
 );
 
 CREATE TABLE IF NOT EXISTS signal_logs (
@@ -144,3 +154,4 @@ CREATE INDEX IF NOT EXISTS idx_orders_received_at ON orders (received_at DESC);
 CREATE INDEX IF NOT EXISTS idx_signal_logs_received_at ON signal_logs (received_at DESC);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs (timestamp DESC);
 CREATE INDEX IF NOT EXISTS idx_subscriptions_strategy ON subscriptions (strategy_id);
+CREATE INDEX IF NOT EXISTS idx_realized_trades_closed_at ON realized_trades (closed_at DESC);

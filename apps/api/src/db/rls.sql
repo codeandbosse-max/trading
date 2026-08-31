@@ -14,6 +14,7 @@ ALTER TABLE public.audit_logs        ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notifications     ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.settings          ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.processed_signals ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.realized_trades   ENABLE ROW LEVEL SECURITY;
 
 -- Retire aussi les privilèges par défaut accordés par Supabase aux rôles publics.
 DO $$

@@ -50,6 +50,7 @@ const signalStatusMap: Record<string, { label: string; color: string }> = {
 export default function HistoryPage() {
   const { state } = useStore();
   const { auditLogs, signalLogs } = state;
+  const { loadMore } = useStore();
   const [search, setSearch] = useState('');
   const [severityFilter, setSeverityFilter] = useState('all');
 
@@ -170,6 +171,16 @@ export default function HistoryPage() {
           {filtered.length === 0 && (
             <div className="py-12 text-center text-sm text-muted-foreground">
               Aucune entrée ne correspond à vos filtres.
+            </div>
+          )}
+          {auditLogs.length < state.counts.auditLogs && (
+            <div className="flex items-center justify-center gap-3 pt-3 text-xs text-muted-foreground">
+              <span>
+                {auditLogs.length} sur {state.counts.auditLogs} entrées
+              </span>
+              <Button variant="outline" size="sm" onClick={() => void loadMore('auditLogs')}>
+                Charger plus
+              </Button>
             </div>
           )}
         </CardContent>

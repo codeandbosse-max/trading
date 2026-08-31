@@ -5,6 +5,9 @@ import { setDb, type Db } from '../db/pool';
 import { seed } from '../db/seed';
 import { createApp } from '../index';
 import { runExecutionTick } from '../services/execution';
+import { riskRuleTests } from './risk-rules';
+import { brokerTests } from './brokers';
+import { alertTests } from './alerts';
 
 let failures = 0;
 
@@ -94,6 +97,14 @@ async function main(): Promise<void> {
   const strategyId: string = created.body.id;
   const secret: string = created.body.webhookSecret;
   const webhookId: string = created.body.webhookId;
+
+  // The seeded trading-hours rule would otherwise make this suite time-dependent.
+  const disableHours = await json('/api/risk/rules/risk-010', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ value: '09:30–16:00 ET', enabled: false }),
+  });
+  check('règle de plage horaire désactivable', disableHours.body?.enabled === false, JSON.stringify(disableHours.body));
 
   // --- Subscription -------------------------------------------------------
   const sub = await json('/api/subscriptions', {
@@ -228,14 +239,30 @@ async function main(): Promise<void> {
 
   // --- Execution worker fills the order ----------------------------------
   const beforeFill = await json('/api/orders');
-  const submitted = beforeFill.body.filter((o: { status: string }) => o.status === 'soumis');
+  const submitted = beforeFill.body.items.filter((o: { status: string }) => o.status === 'soumis');
   check('ordre en statut soumis', submitted.length === 1, String(submitted.length));
 
   await runExecutionTick();
 
   const afterFill = await json('/api/orders');
-  const executed = afterFill.body.filter((o: { status: string }) => o.status === 'execute');
+  const executed = afterFill.body.items.filter((o: { status: string }) => o.status === 'execute');
   check('le worker exécute l’ordre', executed.length === 1, String(executed.length));
+  check(
+    'la route d’exécution est tracée',
+    executed[0]?.executionVenue === 'simulation',
+    String(executed[0]?.executionVenue)
+  );
+
+  // --- Pagination ---------------------------------------------------------
+  const paged = await json('/api/orders?limit=1&offset=0');
+  check('pagination : limite respectée', paged.body.items.length === 1, String(paged.body.items.length));
+  check('pagination : total renvoyé', paged.body.total >= 1, String(paged.body.total));
+  const pagedOffset = await json('/api/orders?limit=1&offset=1');
+  check(
+    'pagination : l’offset change de page',
+    pagedOffset.body.items[0]?.id !== paged.body.items[0]?.id,
+    `${paged.body.items[0]?.id} / ${pagedOffset.body.items[0]?.id}`
+  );
 
   const positions = await json('/api/positions');
   check('une position est ouverte', positions.body.length === 1, JSON.stringify(positions.body));
@@ -249,6 +276,76 @@ async function main(): Promise<void> {
     body: JSON.stringify({ action: 'cancel' }),
   });
   check('un ordre exécuté ne peut être annulé (409)', conflict.status === 409, String(conflict.status));
+
+  // --- Simulation subscriptions are executed too --------------------------
+  await json('/api/subscriptions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      strategyId,
+      connectionId: 'conn-003',
+      enabled: true,
+      executionMode: 'simulation',
+      sizingMethod: 'quantite_fixe',
+      sizingValue: 3,
+      maxOrderSize: 50,
+      maxExposure: 40000,
+      allowShort: false,
+    }),
+  });
+
+  const simPayload = JSON.stringify({
+    signalId: 'sig-e2e-sim',
+    ticker: 'MSFT',
+    action: 'buy',
+    price: 150,
+    source: 'Suite de tests',
+  });
+  const simSignal = await json(`/api/webhook/${webhookId}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-signaldesk-signature': sign(secret, simPayload),
+    },
+    body: simPayload,
+  });
+  check('signal routé vers deux abonnements', simSignal.body?.ordersCreated === 2, JSON.stringify(simSignal.body));
+
+  const simOrders = await json('/api/orders?limit=500');
+  const validated = simOrders.body.items.filter(
+    (o: { signalId: string; status: string }) => o.signalId === 'sig-e2e-sim' && o.status === 'valide'
+  );
+  check('abonnement simulation crée un ordre validé', validated.length === 1, String(validated.length));
+
+  await runExecutionTick(10);
+
+  const afterSim = await json('/api/orders?limit=500');
+  const simExecuted = afterSim.body.items.find(
+    (o: { id: string }) => o.id === validated[0]?.id
+  );
+  check(
+    'ordre en mode simulation exécuté',
+    simExecuted?.status === 'execute',
+    String(simExecuted?.status)
+  );
+  check(
+    'exécution routée vers la place simulée',
+    simExecuted?.executionVenue === 'simulation',
+    String(simExecuted?.executionVenue)
+  );
+
+  // --- Realised P&L feeds the loss rules ----------------------------------
+  const positionsBefore = await json('/api/positions');
+  const msft = positionsBefore.body.find((p: { ticker: string }) => p.ticker === 'MSFT');
+  if (msft) {
+    await json(`/api/positions/${msft.id}`, { method: 'DELETE' });
+  }
+  const stateAfterClose = await json('/api/state');
+  check(
+    'la clôture manuelle retire la position',
+    !stateAfterClose.body.positions.some((p: { id: string }) => p.id === msft?.id),
+    String(msft?.id)
+  );
 
   // --- Serverless cron endpoint ------------------------------------------
   const cronNoAuth = await json('/api/tasks/tick');
@@ -280,7 +377,11 @@ async function main(): Promise<void> {
     },
     body: hobbyPayload,
   });
-  check('signal accepté sans worker', hobbySignal.body?.ordersCreated === 1, JSON.stringify(hobbySignal.body));
+  check(
+    'signal accepté sans worker',
+    hobbySignal.body?.ordersCreated === 2,
+    JSON.stringify(hobbySignal.body)
+  );
 
   // Reading the state is what advances the pending order.
   await json('/api/state');
@@ -301,7 +402,7 @@ async function main(): Promise<void> {
 
   // --- Audit trail --------------------------------------------------------
   const audit = await json('/api/audit-logs');
-  const actions = audit.body.map((a: { action: string }) => a.action);
+  const actions = audit.body.items.map((a: { action: string }) => a.action);
   check('audit: création de stratégie journalisée', actions.includes('strategie.creation'));
   check('audit: coupe-circuit journalisé', actions.includes('risque.coupe_circuit_active'));
 
@@ -319,6 +420,15 @@ async function main(): Promise<void> {
   check('ressource inconnue renvoie 404', missing.status === 404, String(missing.status));
 
   server.close();
+
+  console.log('\n--- Règles de risque ---');
+  riskRuleTests(check);
+
+  console.log('\n--- Adaptateurs courtiers ---');
+  await brokerTests(check);
+
+  console.log('\n--- Alertes externes ---');
+  await alertTests(check);
 
   console.log(failures === 0 ? '\nTous les tests sont passés.' : `\n${failures} test(s) en échec.`);
   process.exit(failures === 0 ? 0 : 1);

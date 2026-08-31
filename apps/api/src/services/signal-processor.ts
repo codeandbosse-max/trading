@@ -5,19 +5,25 @@ import {
   type IncomingSignal,
   type Order,
   type OrderStatus,
+  type RiskContext,
   type SignalLog,
   type SignalResult,
 } from '@trading/shared';
 import { getDb } from '../db/pool';
 import { uid } from '../lib/crypto';
+import { config } from '../config';
 import {
+  countConsecutiveLosses,
+  countOrdersSince,
   findStrategyByWebhookId,
   getKillSwitch,
   listConnections,
+  listPositions,
   listRiskRules,
   listSubscriptionsForStrategy,
   mapOrder,
   mapSignalLog,
+  realizedPnlSince,
 } from '../repositories/queries';
 import { pushNotification } from './journal';
 
@@ -47,8 +53,9 @@ async function insertOrder(order: Omit<Order, 'id'>): Promise<Order> {
     `INSERT INTO orders
        (id, signal_id, ticker, action, side, quantity, order_type, limit_price, stop_price,
         time_in_force, status, strategy_id, strategy_name, connection_id, connection_name,
-        broker_order_id, filled_qty, avg_fill_price, rejection_reason, received_at, submitted_at, executed_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
+        broker_order_id, filled_qty, avg_fill_price, rejection_reason, received_at, submitted_at,
+        executed_at, execution_venue)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
      RETURNING *`,
     [
       uid('ord'),
@@ -73,6 +80,7 @@ async function insertOrder(order: Omit<Order, 'id'>): Promise<Order> {
       order.receivedAt,
       order.submittedAt,
       order.executedAt,
+      order.executionVenue,
     ]
   );
   return mapOrder(rows[0]);
@@ -125,13 +133,33 @@ export async function processSignal(signal: IncomingSignal): Promise<SignalResul
     }
   }
 
-  const [killSwitch, riskRules, connections] = await Promise.all([
+  const [killSwitch, riskRules, connections, positions] = await Promise.all([
     getKillSwitch(),
     listRiskRules(),
     listConnections(),
+    listPositions(),
   ]);
 
-  const ctx = { killSwitch, riskRules, connections };
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const [ordersToday, realizedPnlToday, consecutiveLosses] = await Promise.all([
+    countOrdersSince(startOfDay),
+    realizedPnlSince(startOfDay),
+    countConsecutiveLosses(),
+  ]);
+
+  const ctx: RiskContext = {
+    killSwitch,
+    riskRules,
+    connections,
+    positions,
+    ordersToday,
+    realizedPnlToday,
+    consecutiveLosses,
+    now: new Date(),
+    timeZone: config.riskTimeZone,
+  };
+
   const created: Order[] = [];
   const rejections: string[] = [];
 
@@ -149,7 +177,7 @@ export async function processSignal(signal: IncomingSignal): Promise<SignalResul
     }
 
     const status: OrderStatus =
-      sub.executionMode === 'validation_manuelle'
+      sub.executionMode === 'validation_manuelle' || decision.requireManualValidation
         ? 'en_attente_validation'
         : sub.executionMode === 'simulation'
         ? 'valide'
@@ -166,20 +194,21 @@ export async function processSignal(signal: IncomingSignal): Promise<SignalResul
         quantity,
         orderType,
         limitPrice: orderType === 'limit' ? price : null,
-        stopPrice: orderType === 'stop' ? price : null,
+        stopPrice: orderType === 'stop' ? price : signal.stopLoss ?? null,
         timeInForce: 'day',
         status,
         strategyId: strategy.id,
         strategyName: strategy.name,
         connectionId: connection.id,
         connectionName: connection.name,
-        brokerOrderId: status === 'soumis' ? uid('brk').toUpperCase() : null,
+        brokerOrderId: null,
         filledQty: 0,
         avgFillPrice: null,
         rejectionReason: null,
         receivedAt: now,
-        submittedAt: status === 'soumis' ? now : null,
+        submittedAt: null,
         executedAt: null,
+        executionVenue: 'simulation',
       })
     );
   }

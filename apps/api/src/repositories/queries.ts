@@ -125,6 +125,7 @@ export function mapOrder(row: Row): Order {
     receivedAt: iso(row.received_at),
     submittedAt: isoOrNull(row.submitted_at),
     executedAt: isoOrNull(row.executed_at),
+    executionVenue: row.execution_venue ?? 'simulation',
   };
 }
 
@@ -249,12 +250,19 @@ export async function listSubscriptionsForStrategy(strategyId: string): Promise<
   return rows.map(mapSubscription);
 }
 
-export async function listOrders(limit = 200): Promise<Order[]> {
+export async function listOrders(limit = 200, offset = 0): Promise<Order[]> {
   const { rows } = await getDb().query(
-    `SELECT * FROM orders ORDER BY received_at DESC LIMIT $1`,
-    [limit]
+    `SELECT * FROM orders ORDER BY received_at DESC LIMIT $1 OFFSET $2`,
+    [limit, offset]
   );
   return rows.map(mapOrder);
+}
+
+export async function countRows(table: string): Promise<number> {
+  const allowed = ['orders', 'signal_logs', 'audit_logs', 'notifications'];
+  if (!allowed.includes(table)) throw new Error(`Table non autorisée : ${table}`);
+  const { rows } = await getDb().query(`SELECT COUNT(*) AS total FROM ${table}`);
+  return num(rows[0]?.total);
 }
 
 export async function findOrder(id: string): Promise<Order | null> {
@@ -262,10 +270,10 @@ export async function findOrder(id: string): Promise<Order | null> {
   return rows[0] ? mapOrder(rows[0]) : null;
 }
 
-export async function listSignalLogs(limit = 200): Promise<SignalLog[]> {
+export async function listSignalLogs(limit = 200, offset = 0): Promise<SignalLog[]> {
   const { rows } = await getDb().query(
-    `SELECT * FROM signal_logs ORDER BY received_at DESC LIMIT $1`,
-    [limit]
+    `SELECT * FROM signal_logs ORDER BY received_at DESC LIMIT $1 OFFSET $2`,
+    [limit, offset]
   );
   return rows.map(mapSignalLog);
 }
@@ -280,10 +288,10 @@ export async function listRiskRules(): Promise<RiskRule[]> {
   return rows.map(mapRiskRule);
 }
 
-export async function listAuditLogs(limit = 300): Promise<AuditLog[]> {
+export async function listAuditLogs(limit = 300, offset = 0): Promise<AuditLog[]> {
   const { rows } = await getDb().query(
-    `SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT $1`,
-    [limit]
+    `SELECT * FROM audit_logs ORDER BY timestamp DESC LIMIT $1 OFFSET $2`,
+    [limit, offset]
   );
   return rows.map(mapAuditLog);
 }
@@ -306,5 +314,62 @@ export async function setKillSwitch(active: boolean): Promise<void> {
     `INSERT INTO settings (key, value) VALUES ('kill_switch', $1)
      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
     [active ? 'true' : 'false']
+  );
+}
+
+export async function findConnectionCredentials(
+  id: string
+): Promise<{ apiKeyCipher: string | null; apiSecretCipher: string | null }> {
+  const { rows } = await getDb().query(
+    `SELECT api_key_cipher, api_secret_cipher FROM connections WHERE id = $1`,
+    [id]
+  );
+  return {
+    apiKeyCipher: rows[0]?.api_key_cipher ?? null,
+    apiSecretCipher: rows[0]?.api_secret_cipher ?? null,
+  };
+}
+
+export async function countOrdersSince(since: Date): Promise<number> {
+  const { rows } = await getDb().query(
+    `SELECT COUNT(*) AS total FROM orders WHERE received_at >= $1`,
+    [since.toISOString()]
+  );
+  return num(rows[0]?.total);
+}
+
+export async function realizedPnlSince(since: Date): Promise<number> {
+  const { rows } = await getDb().query(
+    `SELECT COALESCE(SUM(pnl), 0) AS total FROM realized_trades WHERE closed_at >= $1`,
+    [since.toISOString()]
+  );
+  return num(rows[0]?.total);
+}
+
+/** Counts losing trades from the most recent one backwards. */
+export async function countConsecutiveLosses(lookback = 50): Promise<number> {
+  const { rows } = await getDb().query(
+    `SELECT pnl FROM realized_trades ORDER BY closed_at DESC LIMIT $1`,
+    [lookback]
+  );
+  let streak = 0;
+  for (const row of rows) {
+    if (num(row.pnl) < 0) streak += 1;
+    else break;
+  }
+  return streak;
+}
+
+export async function recordRealizedTrade(input: {
+  id: string;
+  ticker: string;
+  connectionName: string;
+  quantity: number;
+  pnl: number;
+}): Promise<void> {
+  await getDb().query(
+    `INSERT INTO realized_trades (id, ticker, connection_name, quantity, pnl, closed_at)
+     VALUES ($1, $2, $3, $4, $5, now())`,
+    [input.id, input.ticker, input.connectionName, input.quantity, input.pnl]
   );
 }

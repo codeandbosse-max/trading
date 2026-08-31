@@ -1,8 +1,12 @@
 import type {
   AppState,
+  AuditLog,
   Connection,
   ConnectionFormOutput,
+  Order,
+  Page,
   RiskRule,
+  SignalLog,
   Strategy,
   StrategyPayload,
   Subscription,
@@ -44,6 +48,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   getState: () => request<AppState>('/api/state'),
+
+  getOrders: (limit: number) => request<Page<Order>>(`/api/orders?limit=${limit}`),
+  getSignalLogs: (limit: number) => request<Page<SignalLog>>(`/api/signal-logs?limit=${limit}`),
+  getAuditLogs: (limit: number) => request<Page<AuditLog>>(`/api/audit-logs?limit=${limit}`),
 
   createStrategy: (input: StrategyPayload) =>
     request<Strategy>('/api/strategies', { method: 'POST', body: JSON.stringify(input) }),
