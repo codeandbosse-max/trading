@@ -23,8 +23,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useStore } from '@/lib/store';
-import type { Connection } from '@/lib/mock-data';
-import { connectionSchema, connectionEnvs, type ConnectionFormValues, type ConnectionFormOutput } from '@/lib/schemas';
+import { connectionEnvs, type Connection } from '@trading/shared';
+import {
+  connectionFormSchema,
+  splitTickers,
+  type ConnectionFormValues,
+  type ConnectionFormOutput,
+} from '@/lib/forms';
 
 const brokers = ['Alpaca', 'Interactive Brokers', 'Binance', 'Tradier', 'Coinbase'];
 
@@ -67,7 +72,7 @@ export function ConnectionDialog({
     setValue,
     formState: { errors, isSubmitting },
   } = useForm<ConnectionFormValues, unknown, ConnectionFormOutput>({
-    resolver: zodResolver(connectionSchema),
+    resolver: zodResolver(connectionFormSchema),
     defaultValues: defaults(connection),
   });
 
@@ -78,18 +83,30 @@ export function ConnectionDialog({
   const broker = watch('broker');
   const env = watch('env');
 
-  const onSubmit = (values: ConnectionFormOutput) => {
-    // API credentials are never persisted client-side; only the connection metadata is stored.
-    const { apiKey: _apiKey, apiSecret: _apiSecret, ...meta } = values;
-    if (connection) {
-      updateConnection({ ...connection, ...meta });
-      toast.success('Connexion mise à jour', { description: meta.name });
-    } else {
-      createConnection(meta);
-      toast.success('Connexion ajoutée', { description: `${meta.broker} — ${envLabels[meta.env]}` });
+  const onSubmit = async (values: ConnectionFormOutput) => {
+    const payload = {
+      ...values,
+      allowedInstruments: splitTickers(values.allowedInstruments),
+    };
+    try {
+      if (connection) {
+        // Credentials are only sent when creating a connection.
+        const { apiKey: _key, apiSecret: _secret, ...meta } = payload;
+        await updateConnection(connection.id, meta);
+        toast.success('Connexion mise à jour', { description: meta.name });
+      } else {
+        await createConnection(payload);
+        toast.success('Connexion ajoutée', {
+          description: `${values.broker} — ${envLabels[values.env]}`,
+        });
+      }
+      reset(defaults());
+      onOpenChange(false);
+    } catch (error) {
+      toast.error('Enregistrement impossible', {
+        description: error instanceof Error ? error.message : undefined,
+      });
     }
-    reset(defaults());
-    onOpenChange(false);
   };
 
   return (
@@ -131,8 +148,7 @@ export function ConnectionDialog({
               <Select
                 value={env}
                 onValueChange={(v) => setValue('env', v as ConnectionFormValues['env'])}
-              >
-                <SelectTrigger>
+              >                <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

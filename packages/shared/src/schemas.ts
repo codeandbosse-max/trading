@@ -14,13 +14,23 @@ export const sizingMethods = [
   'taille_du_signal',
 ] as const;
 export const orderTypes = ['market', 'limit', 'stop', 'stop_limit'] as const;
+export const orderStatuses = [
+  'recu',
+  'valide',
+  'en_attente_validation',
+  'envoi_en_cours',
+  'soumis',
+  'execute_partiellement',
+  'execute',
+  'annule',
+  'rejete',
+  'erreur',
+] as const;
 
-const tickerList = z
-  .string()
-  .trim()
-  .transform((v) => (v.length === 0 ? [] : v.split(',').map((t) => t.trim()).filter(Boolean)));
+/** API contract: ticker lists are always arrays. */
+const tickerList = z.array(z.string().trim().min(1).max(20)).max(500);
 
-export const strategySchema = z.object({
+export const strategyInputSchema = z.object({
   name: z.string().trim().min(3, 'Le nom doit contenir au moins 3 caractères.').max(60),
   description: z.string().trim().min(10, 'Décrivez la stratégie en 10 caractères minimum.').max(300),
   status: z.enum(strategyStatuses),
@@ -35,26 +45,33 @@ export const strategySchema = z.object({
   defaultOrderType: z.enum(orderTypes),
 });
 
-export type StrategyFormValues = z.input<typeof strategySchema>;
-export type StrategyFormOutput = z.output<typeof strategySchema>;
+export type StrategyInput = z.input<typeof strategyInputSchema>;
+export type StrategyPayload = z.output<typeof strategyInputSchema>;
 
-export const connectionSchema = z.object({
+export const connectionInputSchema = z.object({
   name: z.string().trim().min(3, 'Le nom doit contenir au moins 3 caractères.').max(60),
   broker: z.string().trim().min(2, 'Indiquez le courtier.'),
   env: z.enum(connectionEnvs),
   status: z.enum(connectionStatuses),
   currency: z.string().trim().length(3, 'Code devise sur 3 lettres (ex. USD).').toUpperCase(),
-  apiKey: z.string().trim().min(8, 'Clé API trop courte.'),
-  apiSecret: z.string().trim().min(8, 'Secret API trop court.'),
   buyingPower: z.coerce.number().min(0),
   equity: z.coerce.number().min(0),
   allowedInstruments: tickerList,
 });
 
-export type ConnectionFormValues = z.input<typeof connectionSchema>;
-export type ConnectionFormOutput = z.output<typeof connectionSchema>;
+export type ConnectionInput = z.input<typeof connectionInputSchema>;
+export type ConnectionPayload = z.output<typeof connectionInputSchema>;
 
-export const subscriptionSchema = z
+/** Credentials are accepted by the API but never returned to clients. */
+export const connectionFormSchema = connectionInputSchema.extend({
+  apiKey: z.string().trim().min(8, 'Clé API trop courte.'),
+  apiSecret: z.string().trim().min(8, 'Secret API trop court.'),
+});
+
+export type ConnectionFormValues = z.input<typeof connectionFormSchema>;
+export type ConnectionFormOutput = z.output<typeof connectionFormSchema>;
+
+export const subscriptionInputSchema = z
   .object({
     strategyId: z.string().min(1, 'Sélectionnez une stratégie.'),
     connectionId: z.string().min(1, 'Sélectionnez une connexion.'),
@@ -65,19 +82,26 @@ export const subscriptionSchema = z
     maxOrderSize: z.coerce.number().positive('La taille maximale doit être positive.'),
     maxExposure: z.coerce.number().positive('L’exposition maximale doit être positive.'),
     allowShort: z.boolean(),
-    tickerOverride: z.string().trim().max(20).optional(),
+    tickerOverride: z.string().trim().max(20).nullable().optional(),
   })
-  .refine((v) => v.sizingValue <= v.maxOrderSize || v.sizingMethod !== 'quantite_fixe', {
+  .refine((v) => v.sizingMethod !== 'quantite_fixe' || v.sizingValue <= v.maxOrderSize, {
     message: 'La quantité fixe dépasse la taille maximale d’ordre.',
     path: ['sizingValue'],
   });
 
-export type SubscriptionFormValues = z.input<typeof subscriptionSchema>;
-export type SubscriptionFormOutput = z.output<typeof subscriptionSchema>;
+export type SubscriptionInput = z.input<typeof subscriptionInputSchema>;
+export type SubscriptionPayload = z.output<typeof subscriptionInputSchema>;
 
-export const riskRuleSchema = z.object({
-  value: z.string().trim().min(1, 'Valeur requise.'),
+export const riskRuleUpdateSchema = z.object({
+  value: z.string().trim().min(1, 'Valeur requise.').max(60),
   enabled: z.boolean(),
+});
+
+export const killSwitchSchema = z.object({ active: z.boolean() });
+
+export const orderActionSchema = z.object({
+  action: z.enum(['approve', 'reject', 'cancel', 'retry']),
+  reason: z.string().trim().max(200).optional(),
 });
 
 /** Payload accepted by the public webhook ingestion endpoint. */

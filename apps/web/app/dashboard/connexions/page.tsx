@@ -39,7 +39,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { ConnectionDialog } from '@/components/dashboard/connection-dialog';
 import { useStore } from '@/lib/store';
-import { type Connection, type ConnectionStatus, type ConnectionEnv } from '@/lib/mock-data';
+import { type Connection, type ConnectionStatus, type ConnectionEnv } from '@trading/shared';
 import { formatCurrency, formatDateTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -80,9 +80,9 @@ export default function ConnectionsPage() {
     setTestingId(null);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!pendingDelete) return;
-    deleteConnection(pendingDelete.id);
+    await deleteConnection(pendingDelete.id);
     toast.success('Connexion supprimée', { description: pendingDelete.name });
     setPendingDelete(null);
   };

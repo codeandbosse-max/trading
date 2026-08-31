@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useStore } from '@/lib/store';
 import { toCsv, downloadCsv } from '@/lib/export';
-import type { Position } from '@/lib/mock-data';
+import type { Position } from '@trading/shared';
 import { formatCurrency, formatPercent } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -59,9 +59,9 @@ export default function PositionsPage() {
     toast.success('Export terminé', { description: `${positions.length} position(s).` });
   };
 
-  const confirmClose = () => {
+  const confirmClose = async () => {
     if (!pendingClose) return;
-    closePosition(pendingClose.id);
+    await closePosition(pendingClose.id);
     toast.success('Position clôturée', { description: pendingClose.ticker });
     setPendingClose(null);
   };

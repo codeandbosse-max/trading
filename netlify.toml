@@ -1,6 +1,7 @@
 [build]
-command = "npx next build"
-publish = ".next"
+base = "."
+command = "npm run build:shared && npm run build --workspace @trading/web"
+publish = "apps/web/.next"
 
 [[plugins]]
 package = "@netlify/plugin-nextjs"

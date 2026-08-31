@@ -1,0 +1,26 @@
+{
+  "name": "trading",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build:shared": "npm run build --workspace @trading/shared",
+    "dev": "npm run build:shared && concurrently -n api,web -c magenta,cyan \"npm run dev --workspace @trading/api\" \"npm run dev --workspace @trading/web\"",
+    "dev:api": "npm run build:shared && npm run dev --workspace @trading/api",
+    "dev:web": "npm run build:shared && npm run dev --workspace @trading/web",
+    "build": "npm run build:shared && npm run build --workspace @trading/api && npm run build --workspace @trading/web",
+    "typecheck": "npm run build:shared && npm run typecheck --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run build:shared && npm run test --workspace @trading/api",
+    "db:migrate": "npm run db:migrate --workspace @trading/api",
+    "db:seed": "npm run db:seed --workspace @trading/api",
+    "db:harden": "npm run db:harden --workspace @trading/api",
+    "db:script": "npm run db:script --workspace @trading/api"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

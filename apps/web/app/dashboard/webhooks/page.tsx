@@ -25,6 +25,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useStore } from '@/lib/store';
+import { api, API_URL } from '@/lib/api';
 import { signPayload } from '@/lib/hmac';
 import { timeAgo } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -54,14 +55,14 @@ const exampleResponse = `{
 }`;
 
 export default function WebhooksPage() {
-  const { state, regenerateSecret } = useStore();
+  const { state, regenerateSecret, refresh } = useStore();
   const { strategies, signalLogs } = state;
   const [copied, setCopied] = useState<string | null>(null);
   const [showSecret, setShowSecret] = useState<Record<string, boolean>>({});
   const [sending, setSending] = useState<string | null>(null);
   const [origin, setOrigin] = useState('');
 
-  useEffect(() => setOrigin(window.location.origin), []);
+  useEffect(() => setOrigin(API_URL), []);
 
   const copy = (text: string, id: string) => {
     navigator.clipboard?.writeText(text);
@@ -85,18 +86,17 @@ export default function WebhooksPage() {
         source: 'Test manuel',
       });
       const signature = await signPayload(strategy.webhookSecret, body);
-      const res = await fetch(`/api/webhook/${strategy.webhookId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-signaldesk-signature': signature,
-        },
-        body,
-      });
+      const res = await api.sendSignal(strategy.webhookId, signature, body);
       if (res.ok) {
-        toast.success('Signal de test accepté', {
-          description: 'Il apparaîtra dans le journal sous quelques secondes.',
-        });
+        const data = await res.json();
+        if (data.accepted) {
+          toast.success('Signal de test accepté', {
+            description: `${data.ordersCreated} ordre(s) créé(s).`,
+          });
+        } else {
+          toast.warning('Signal reçu mais non exécuté', { description: data.reason });
+        }
+        await refresh();
       } else {
         const data = await res.json().catch(() => ({ error: 'Erreur inconnue' }));
         toast.error('Signal refusé', { description: data.error });

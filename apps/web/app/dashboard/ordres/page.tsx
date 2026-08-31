@@ -42,7 +42,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { useStore } from '@/lib/store';
 import { toCsv, downloadCsv } from '@/lib/export';
-import { type OrderStatus } from '@/lib/mock-data';
+import { type OrderStatus } from '@trading/shared';
 import { formatCurrency, formatDateTime, formatTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 

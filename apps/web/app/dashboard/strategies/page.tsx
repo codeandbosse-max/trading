@@ -45,7 +45,7 @@ import {
 import { StrategyDialog } from '@/components/dashboard/strategy-dialog';
 import { SubscriptionDialog } from '@/components/dashboard/subscription-dialog';
 import { useStore } from '@/lib/store';
-import { type Strategy, type StrategyStatus, type Subscription } from '@/lib/mock-data';
+import { type Strategy, type StrategyStatus, type StrategyPayload, type Subscription } from '@trading/shared';
 import { formatDateTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -112,41 +112,52 @@ export default function StrategiesPage() {
     setFormOpen(true);
   };
 
-  const duplicate = (strategy: Strategy) => {
-    const copy = createStrategy({
-      name: `${strategy.name} (copie)`,
-      description: strategy.description,
-      status: 'brouillon',
-      assetClass: strategy.assetClass,
-      allowedActions: strategy.allowedActions,
-      whitelist: strategy.whitelist,
-      blacklist: strategy.blacklist,
-      maxSignalDelaySec: strategy.maxSignalDelaySec,
-      rejectDuplicates: strategy.rejectDuplicates,
-      maxVolume: strategy.maxVolume,
-      maxExposure: strategy.maxExposure,
-      defaultOrderType: strategy.defaultOrderType,
-    });
-    toast.success('Stratégie dupliquée', { description: copy.name });
-    setSelectedId(copy.id);
+  const toPayload = (strategy: Strategy): StrategyPayload => ({
+    name: strategy.name,
+    description: strategy.description,
+    status: strategy.status,
+    assetClass: strategy.assetClass,
+    allowedActions: strategy.allowedActions,
+    whitelist: strategy.whitelist,
+    blacklist: strategy.blacklist,
+    maxSignalDelaySec: strategy.maxSignalDelaySec,
+    rejectDuplicates: strategy.rejectDuplicates,
+    maxVolume: strategy.maxVolume,
+    maxExposure: strategy.maxExposure,
+    defaultOrderType: strategy.defaultOrderType as StrategyPayload['defaultOrderType'],
+  });
+
+  const duplicate = async (strategy: Strategy) => {
+    try {
+      await createStrategy({
+        ...toPayload(strategy),
+        name: `${strategy.name} (copie)`,
+        status: 'brouillon',
+      });
+      toast.success('Stratégie dupliquée', { description: `${strategy.name} (copie)` });
+    } catch (error) {
+      toast.error('Duplication impossible', {
+        description: error instanceof Error ? error.message : undefined,
+      });
+    }
   };
 
-  const toggleStatus = (strategy: Strategy) => {
+  const toggleStatus = async (strategy: Strategy) => {
     const next: StrategyStatus = strategy.status === 'active' ? 'suspendue' : 'active';
-    updateStrategy({ ...strategy, status: next });
+    await updateStrategy(strategy.id, { ...toPayload(strategy), status: next });
     toast.success(next === 'active' ? 'Stratégie activée' : 'Stratégie suspendue');
   };
 
-  const rotateSecret = (strategy: Strategy) => {
-    regenerateSecret(strategy.id);
+  const rotateSecret = async (strategy: Strategy) => {
+    await regenerateSecret(strategy.id);
     toast.success('Secret régénéré', {
       description: 'Mettez à jour vos alertes TradingView avec le nouveau secret.',
     });
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (!pendingDelete) return;
-    deleteStrategy(pendingDelete.id);
+    await deleteStrategy(pendingDelete.id);
     toast.success('Stratégie supprimée', { description: pendingDelete.name });
     if (selectedId === pendingDelete.id) setSelectedId(null);
     setPendingDelete(null);

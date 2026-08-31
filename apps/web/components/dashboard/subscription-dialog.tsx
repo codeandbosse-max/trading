@@ -24,14 +24,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useStore } from '@/lib/store';
-import type { Subscription } from '@/lib/mock-data';
+import { executionModes, sizingMethods, type Subscription } from '@trading/shared';
 import {
-  subscriptionSchema,
-  executionModes,
-  sizingMethods,
+  subscriptionFormSchema,
   type SubscriptionFormValues,
   type SubscriptionFormOutput,
-} from '@/lib/schemas';
+} from '@/lib/forms';
 
 const modeLabels: Record<string, string> = {
   automatique: 'Automatique',
@@ -76,7 +74,7 @@ export function SubscriptionDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const { state, createSubscription, saveSubscription } = useStore();
+  const { state, createSubscription, updateSubscription } = useStore();
   const {
     register,
     handleSubmit,
@@ -85,7 +83,7 @@ export function SubscriptionDialog({
     setValue,
     formState: { errors, isSubmitting },
   } = useForm<SubscriptionFormValues, unknown, SubscriptionFormOutput>({
-    resolver: zodResolver(subscriptionSchema),
+    resolver: zodResolver(subscriptionFormSchema),
     defaultValues: defaults(subscription, strategyId),
   });
 
@@ -95,19 +93,25 @@ export function SubscriptionDialog({
 
   const values = watch();
 
-  const onSubmit = (data: SubscriptionFormOutput) => {
+  const onSubmit = async (data: SubscriptionFormOutput) => {
     const payload = {
       ...data,
       tickerOverride: data.tickerOverride && data.tickerOverride.length > 0 ? data.tickerOverride : null,
     };
-    if (subscription) {
-      saveSubscription({ ...subscription, ...payload });
-      toast.success('Abonnement mis à jour');
-    } else {
-      createSubscription(payload);
-      toast.success('Abonnement créé');
+    try {
+      if (subscription) {
+        await updateSubscription(subscription.id, payload);
+        toast.success('Abonnement mis à jour');
+      } else {
+        await createSubscription(payload);
+        toast.success('Abonnement créé');
+      }
+      onOpenChange(false);
+    } catch (error) {
+      toast.error('Enregistrement impossible', {
+        description: error instanceof Error ? error.message : undefined,
+      });
     }
-    onOpenChange(false);
   };
 
   return (

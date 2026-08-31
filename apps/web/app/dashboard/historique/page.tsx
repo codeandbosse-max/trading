@@ -30,7 +30,7 @@ import {
 } from '@/components/ui/select';
 import { useStore } from '@/lib/store';
 import { toCsv, downloadCsv } from '@/lib/export';
-import { type AuditLog } from '@/lib/mock-data';
+import { type AuditLog } from '@trading/shared';
 import { formatDateTime } from '@/lib/format';
 import { cn } from '@/lib/utils';
 

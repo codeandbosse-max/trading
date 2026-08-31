@@ -3,7 +3,6 @@
 import { useState } from 'react';
 import { Sidebar } from '@/components/dashboard/sidebar';
 import { Topbar } from '@/components/dashboard/topbar';
-import { SignalBridge } from '@/components/dashboard/signal-bridge';
 import { StoreProvider } from '@/lib/store';
 import { Toaster } from '@/components/ui/sonner';
 import { cn } from '@/lib/utils';
@@ -51,7 +50,6 @@ export default function DashboardLayout({
           <div className={cn('mx-auto max-w-7xl p-4 md:p-6 lg:p-8')}>{children}</div>
         </main>
       </div>
-      <SignalBridge />
       <Toaster />
     </div>
     </StoreProvider>

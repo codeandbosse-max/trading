@@ -129,8 +129,8 @@ const statusChartConfig: Record<string, { label: string; fill: string }> = {
 };
 
 export default function OverviewPage() {
-  const { state, setLiveFeed, simulateSignal } = useStore();
-  const { signalLogs, orders, connections, positions, killSwitch, liveFeed } = state;
+  const { state, setLiveFeed, simulateSignal, liveFeed } = useStore();
+  const { signalLogs, orders, connections, positions, killSwitch } = state;
 
   const recentSignals = signalLogs.slice(0, 6);
   const recentOrders = orders.slice(0, 5);

@@ -27,16 +27,20 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { useStore } from '@/lib/store';
-import type { Strategy, SignalAction } from '@/lib/mock-data';
 import {
-  strategySchema,
   signalActions,
   assetClasses,
   strategyStatuses,
   orderTypes,
+  type Strategy,
+  type SignalAction,
+} from '@trading/shared';
+import {
+  strategyFormSchema,
+  splitTickers,
   type StrategyFormValues,
   type StrategyFormOutput,
-} from '@/lib/schemas';
+} from '@/lib/forms';
 
 const actionLabels: Record<SignalAction, string> = {
   buy: 'Achat',
@@ -98,7 +102,7 @@ export function StrategyDialog({
     setValue,
     formState: { errors, isSubmitting },
   } = useForm<StrategyFormValues, unknown, StrategyFormOutput>({
-    resolver: zodResolver(strategySchema),
+    resolver: zodResolver(strategyFormSchema),
     defaultValues: defaults(strategy),
   });
 
@@ -119,17 +123,26 @@ export function StrategyDialog({
     setValue('allowedActions', next, { shouldValidate: true });
   };
 
-  const onSubmit = (values: StrategyFormOutput) => {
-    if (strategy) {
-      updateStrategy({ ...strategy, ...values });
-      toast.success('Stratégie mise à jour', { description: values.name });
-    } else {
-      const created = createStrategy(values);
-      toast.success('Stratégie créée', {
-        description: `Webhook ${created.webhookId} généré.`,
+  const onSubmit = async (values: StrategyFormOutput) => {
+    const payload = {
+      ...values,
+      whitelist: splitTickers(values.whitelist),
+      blacklist: splitTickers(values.blacklist),
+    };
+    try {
+      if (strategy) {
+        await updateStrategy(strategy.id, payload);
+        toast.success('Stratégie mise à jour', { description: values.name });
+      } else {
+        await createStrategy(payload);
+        toast.success('Stratégie créée', { description: 'Webhook et secret générés.' });
+      }
+      onOpenChange(false);
+    } catch (error) {
+      toast.error('Enregistrement impossible', {
+        description: error instanceof Error ? error.message : undefined,
       });
     }
-    onOpenChange(false);
   };
 
   return (
