@@ -31,6 +31,7 @@ import {
   mapSubscription,
 } from '../repositories/queries';
 import { pushNotification, recordAudit } from '../services/journal';
+import { maybeRunTick } from '../services/scheduler';
 import { asyncHandler, HttpError } from '../middleware/errors';
 
 export const router = Router();
@@ -40,6 +41,8 @@ const clientIp = (req: { ip?: string }): string => req.ip ?? '-';
 router.get(
   '/state',
   asyncHandler(async (_req, res) => {
+    await maybeRunTick();
+
     const [
       strategies,
       connections,

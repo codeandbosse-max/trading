@@ -19,6 +19,7 @@ function sign(secret: string, body: string): string {
 
 async function main(): Promise<void> {
   process.env.CRON_SECRET = 'secret-de-cron-pour-les-tests-000';
+  process.env.TICK_MIN_INTERVAL_MS = '0';
 
   const mem = newDb({ autoCreateForeignKeyIndices: true });
   mem.public.registerFunction({
@@ -262,6 +263,41 @@ async function main(): Promise<void> {
     headers: { authorization: `Bearer ${process.env.CRON_SECRET}` },
   });
   check('cron authentifié accepté (200)', cronOk.status === 200, JSON.stringify(cronOk.body));
+
+  // --- Execution without any worker or cron (Vercel Hobby) ----------------
+  const hobbyPayload = JSON.stringify({
+    signalId: 'sig-e2e-hobby',
+    ticker: 'MSFT',
+    action: 'buy',
+    price: 300,
+    source: 'Suite de tests',
+  });
+  const hobbySignal = await json(`/api/webhook/${webhookId}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-signaldesk-signature': sign(secret, hobbyPayload),
+    },
+    body: hobbyPayload,
+  });
+  check('signal accepté sans worker', hobbySignal.body?.ordersCreated === 1, JSON.stringify(hobbySignal.body));
+
+  // Reading the state is what advances the pending order.
+  await json('/api/state');
+  const afterState = await json('/api/state');
+  const hobbyOrder = afterState.body.orders.find(
+    (o: { signalId: string }) => o.signalId === 'sig-e2e-hobby'
+  );
+  check(
+    'ordre exécuté via la seule lecture de /api/state',
+    hobbyOrder?.status === 'execute',
+    String(hobbyOrder?.status)
+  );
+  check(
+    'position MSFT ouverte sans cron',
+    afterState.body.positions.some((p: { ticker: string }) => p.ticker === 'MSFT'),
+    JSON.stringify(afterState.body.positions.map((p: { ticker: string }) => p.ticker))
+  );
 
   // --- Audit trail --------------------------------------------------------
   const audit = await json('/api/audit-logs');

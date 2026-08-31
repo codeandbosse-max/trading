@@ -30,6 +30,9 @@ export const config = {
   get cronSecret(): string {
     return process.env.CRON_SECRET ?? '';
   },
+  get tickMinIntervalMs(): number {
+    return Number.parseInt(process.env.TICK_MIN_INTERVAL_MS ?? '3000', 10);
+  },
   // Keep this at 1 behind a connection pooler (Supabase port 6543).
   dbPoolMax: Number.parseInt(process.env.DB_POOL_MAX ?? '10', 10),
 };
