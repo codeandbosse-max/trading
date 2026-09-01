@@ -40,6 +40,7 @@ authRouter.get(
       bootstrap: total === 0,
       signupCodeRequired: total > 0 && Boolean(config.signupCode),
       googleEnabled: config.googleEnabled,
+      authRequired: config.authRequired,
     });
   })
 );

@@ -55,7 +55,12 @@ export const api = {
   getState: () => request<AppState>('/api/state'),
 
   authStatus: () =>
-    request<{ bootstrap: boolean; signupCodeRequired: boolean; googleEnabled: boolean }>(
+    request<{
+      bootstrap: boolean;
+      signupCodeRequired: boolean;
+      googleEnabled: boolean;
+      authRequired: boolean;
+    }>(
       '/api/auth/status'
     ),
   me: () => request<User>('/api/auth/me'),

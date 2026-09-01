@@ -46,6 +46,10 @@ export const config = {
   get signupCode(): string {
     return process.env.SIGNUP_CODE ?? '';
   },
+  // Kept off while the platform is being configured; enable explicitly in production.
+  get authRequired(): boolean {
+    return process.env.AUTH_REQUIRED === 'true';
+  },
   get cookieSecure(): boolean {
     return (process.env.COOKIE_SECURE ?? String(isProduction)) === 'true';
   },

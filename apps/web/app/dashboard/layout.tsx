@@ -10,9 +10,9 @@ import { X, Loader2 } from 'lucide-react';
 
 /** Blocks the dashboard until the session is confirmed by the API. */
 function AuthGate({ children }: { children: React.ReactNode }) {
-  const { hydrated, user } = useStore();
+  const { hydrated, user, authRequired } = useStore();
 
-  if (!hydrated || !user) {
+  if (!hydrated || (authRequired && !user)) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />

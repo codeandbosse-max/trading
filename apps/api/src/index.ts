@@ -35,7 +35,10 @@ export function createApp(): express.Express {
 
   app.use('/api/auth', authRouter);
   app.use('/api/tasks', tasksRouter);
-  app.use('/api', requireAuth, requireWriteAccess, router);
+  if (config.authRequired) {
+    app.use('/api', requireAuth, requireWriteAccess);
+  }
+  app.use('/api', router);
 
   app.use(notFound);
   app.use(errorHandler);

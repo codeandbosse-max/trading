@@ -191,20 +191,22 @@ export function Topbar({ onMenuClick }: { onMenuClick: () => void }) {
               .toUpperCase()}
           </div>
           <div className="hidden flex-col leading-tight sm:flex">
-            <span className="text-xs font-medium">{user?.name ?? '—'}</span>
+            <span className="text-xs font-medium">{user?.name ?? 'Mode ouvert'}</span>
             <span className="text-[11px] capitalize text-muted-foreground">
-              {user?.role ?? ''}
+              {user?.role ?? 'Authentification désactivée'}
             </span>
           </div>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-7 w-7 text-muted-foreground"
-            onClick={() => void logout()}
-            aria-label="Se déconnecter"
-          >
-            <LogOut className="h-4 w-4" />
-          </Button>
+          {user && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 text-muted-foreground"
+              onClick={() => void logout()}
+              aria-label="Se déconnecter"
+            >
+              <LogOut className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
 

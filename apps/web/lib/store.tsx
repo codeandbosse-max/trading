@@ -41,6 +41,7 @@ const EMPTY_STATE: AppState = {
 interface StoreApi {
   state: AppState;
   user: User | null;
+  authRequired: boolean;
   hydrated: boolean;
   offline: boolean;
   liveFeed: boolean;
@@ -82,6 +83,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const [state, setState] = useState<AppState>(EMPTY_STATE);
   const [user, setUser] = useState<User | null>(null);
+  const [authRequired, setAuthRequired] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [offline, setOffline] = useState(false);
   const [liveFeed, setLiveFeed] = useState(false);
@@ -92,13 +94,18 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
 
   const refresh = useCallback(async () => {
     try {
-      const [me, next] = await Promise.all([api.me(), api.getState()]);
+      const authStatus = await api.authStatus();
+      const me = authStatus.authRequired
+        ? await api.me()
+        : null;
+      const next = await api.getState();
       const limits = limitsRef.current;
       const [orders, signalLogs, auditLogs] = await Promise.all([
         limits.orders > DEFAULT_LIMITS.orders ? api.getOrders(limits.orders) : null,
         limits.signalLogs > DEFAULT_LIMITS.signalLogs ? api.getSignalLogs(limits.signalLogs) : null,
         limits.auditLogs > DEFAULT_LIMITS.auditLogs ? api.getAuditLogs(limits.auditLogs) : null,
       ]);
+      setAuthRequired(authStatus.authRequired);
       setUser(me);
       setState({
         ...next,
@@ -173,6 +180,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     () => ({
       state,
       user,
+      authRequired,
       hydrated,
       offline,
       liveFeed,
@@ -208,7 +216,19 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       markAllNotificationsRead: () => run(() => api.markAllNotificationsRead()),
       loadMore,
     }),
-    [state, user, hydrated, offline, liveFeed, refresh, logout, run, simulateSignal, loadMore]
+    [
+      state,
+      user,
+      authRequired,
+      hydrated,
+      offline,
+      liveFeed,
+      refresh,
+      logout,
+      run,
+      simulateSignal,
+      loadMore,
+    ]
   );
 
   return <StoreContext.Provider value={value}>{children}</StoreContext.Provider>;
