@@ -55,7 +55,9 @@ export const api = {
   getState: () => request<AppState>('/api/state'),
 
   authStatus: () =>
-    request<{ bootstrap: boolean; signupCodeRequired: boolean }>('/api/auth/status'),
+    request<{ bootstrap: boolean; signupCodeRequired: boolean; googleEnabled: boolean }>(
+      '/api/auth/status'
+    ),
   me: () => request<User>('/api/auth/me'),
   register: (input: RegisterPayload) =>
     request<User>('/api/auth/register', { method: 'POST', body: JSON.stringify(input) }),

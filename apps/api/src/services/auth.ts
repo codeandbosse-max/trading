@@ -112,3 +112,45 @@ export async function listUsers(): Promise<User[]> {
   const { rows } = await getDb().query(`SELECT * FROM users ORDER BY created_at`);
   return rows.map(mapUser);
 }
+
+/**
+ * Signs in a Google account, linking it to an existing address when needed.
+ * Account creation follows the same bootstrap and invitation rules as the form.
+ */
+export async function findOrCreateGoogleUser(profile: {
+  googleId: string;
+  email: string;
+  name: string;
+}, signupCode?: string): Promise<User> {
+  const db = getDb();
+
+  const byGoogle = await db.query(`SELECT * FROM users WHERE google_id = $1`, [profile.googleId]);
+  if (byGoogle.rows[0]) return mapUser(byGoogle.rows[0]);
+
+  const byEmail = await db.query(`SELECT * FROM users WHERE email = $1`, [profile.email]);
+  if (byEmail.rows[0]) {
+    const { rows } = await db.query(
+      `UPDATE users SET google_id = $2 WHERE id = $1 RETURNING *`,
+      [byEmail.rows[0].id, profile.googleId]
+    );
+    return mapUser(rows[0]);
+  }
+
+  const existingUsers = await countUsers();
+  if (existingUsers > 0) {
+    if (!config.signupCode) {
+      throw new HttpError(403, 'Les inscriptions sont fermées. Contactez un administrateur.');
+    }
+    if (signupCode !== config.signupCode) {
+      throw new HttpError(403, 'Code d’inscription requis pour créer un compte.');
+    }
+  }
+
+  const role: UserRole = existingUsers === 0 ? 'admin' : 'operateur';
+  const { rows } = await db.query(
+    `INSERT INTO users (id, email, name, password_hash, google_id, role, created_at)
+     VALUES ($1, $2, $3, NULL, $4, $5, now()) RETURNING *`,
+    [uid('user'), profile.email, profile.name, profile.googleId, role]
+  );
+  return mapUser(rows[0]);
+}

@@ -2,7 +2,8 @@ CREATE TABLE IF NOT EXISTS users (
   id            text PRIMARY KEY,
   email         text NOT NULL UNIQUE,
   name          text NOT NULL,
-  password_hash text NOT NULL,
+  password_hash text,
+  google_id     text UNIQUE,
   role          text NOT NULL DEFAULT 'operateur',
   created_at    timestamptz NOT NULL DEFAULT now()
 );

@@ -53,6 +53,24 @@ export const config = {
     const value = process.env.COOKIE_SAMESITE ?? 'lax';
     return value === 'none' || value === 'strict' ? value : 'lax';
   },
+  get webUrl(): string {
+    return process.env.WEB_URL ?? 'http://localhost:3000';
+  },
+  get google() {
+    return {
+      clientId: process.env.GOOGLE_CLIENT_ID ?? '',
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET ?? '',
+      redirectUri: process.env.GOOGLE_REDIRECT_URI ?? '',
+      // Restricts sign-in to a Google Workspace domain when set.
+      allowedDomain: process.env.GOOGLE_ALLOWED_DOMAIN ?? '',
+      authUrl: process.env.GOOGLE_AUTH_URL ?? 'https://accounts.google.com/o/oauth2/v2/auth',
+      tokenUrl: process.env.GOOGLE_TOKEN_URL ?? 'https://oauth2.googleapis.com/token',
+    };
+  },
+  get googleEnabled(): boolean {
+    const g = this.google;
+    return Boolean(g.clientId && g.clientSecret && g.redirectUri);
+  },
   get alerts() {
     return {
       minSeverity: process.env.ALERT_MIN_SEVERITY ?? 'warning',

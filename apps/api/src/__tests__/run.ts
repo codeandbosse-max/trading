@@ -9,6 +9,7 @@ import { riskRuleTests } from './risk-rules';
 import { brokerTests } from './brokers';
 import { alertTests } from './alerts';
 import { authTests } from './auth';
+import { googleTests } from './google';
 
 let failures = 0;
 
@@ -48,6 +49,9 @@ async function main(): Promise<void> {
 
   console.log('--- Authentification ---');
   await authTests(check, base, server);
+
+  console.log('\n--- Connexion Google ---');
+  await googleTests(check, base);
 
   // Every protected call below reuses this session.
   const loginRes = await fetch(`${base}/api/auth/login`, {
