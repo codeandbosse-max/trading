@@ -35,6 +35,16 @@ async function openSession(res: Response, userId: string): Promise<void> {
 authRouter.get(
   '/status',
   asyncHandler(async (_req, res) => {
+    if (!config.authRequired) {
+      res.json({
+        bootstrap: false,
+        signupCodeRequired: false,
+        googleEnabled: false,
+        authRequired: false,
+      });
+      return;
+    }
+
     const total = await countUsers();
     res.json({
       bootstrap: total === 0,
