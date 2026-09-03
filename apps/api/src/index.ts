@@ -5,6 +5,7 @@ import cookieParser from 'cookie-parser';
 import { config } from './config';
 import { router } from './routes/resources';
 import { webhookRouter } from './routes/webhook';
+import { tradingViewRouter } from './routes/tradingview';
 import { authRouter } from './routes/auth';
 import { errorHandler, notFound } from './middleware/errors';
 import { attachUser, requireAuth, requireWriteAccess } from './middleware/auth';
@@ -28,6 +29,7 @@ export function createApp(): express.Express {
 
   // Mounted before the JSON parser: signature verification needs the raw body.
   app.use('/api/webhook', webhookRouter);
+  app.use('/api/relay/tradingview', tradingViewRouter);
 
   app.use(express.json({ limit: '256kb' }));
   app.use(cookieParser());
@@ -35,9 +37,19 @@ export function createApp(): express.Express {
 
   app.use('/api/auth', authRouter);
   app.use('/api/tasks', tasksRouter);
-  if (config.authRequired) {
-    app.use('/api', requireAuth, requireWriteAccess);
-  }
+  app.use('/api', (req, res, next) => {
+    if (!config.authRequired) {
+      next();
+      return;
+    }
+    requireAuth(req, res, (authError?: unknown) => {
+      if (authError) {
+        next(authError);
+        return;
+      }
+      requireWriteAccess(req, res, next);
+    });
+  });
   app.use('/api', router);
 
   app.use(notFound);

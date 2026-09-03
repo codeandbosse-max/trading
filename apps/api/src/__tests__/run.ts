@@ -239,6 +239,35 @@ async function main(): Promise<void> {
     body: JSON.stringify({ active: false }),
   });
 
+  // --- TradingView relay --------------------------------------------------
+  const tvWrongPhrase = await json(`/api/relay/tradingview/${webhookId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      passphrase: 'phrase-secrete-invalide-000000',
+      ticker: 'AAPL',
+      action: 'buy',
+      price: 200,
+    }),
+  });
+  check('relais TradingView : phrase invalide refusée (401)', tvWrongPhrase.status === 401, String(tvWrongPhrase.status));
+
+  const tvPayload = JSON.stringify({
+    passphrase: secret,
+    signal_id: 'tv-e2e-1',
+    ticker: 'AAPL',
+    action: 'buy',
+    price: 200,
+    timestamp: new Date().toISOString(),
+  });
+  const tvAccepted = await json(`/api/relay/tradingview/${webhookId}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: tvPayload,
+  });
+  check('relais TradingView : signal accepté (202)', tvAccepted.status === 202, JSON.stringify(tvAccepted.body));
+  check('relais TradingView : alias signal_id préservé', tvAccepted.body?.signalId === 'tv-e2e-1', String(tvAccepted.body?.signalId));
+
   // --- Whitelist enforcement ---------------------------------------------
   const offList = JSON.stringify({
     signalId: 'sig-e2e-3',
@@ -262,13 +291,13 @@ async function main(): Promise<void> {
   // --- Execution worker fills the order ----------------------------------
   const beforeFill = await json('/api/orders');
   const submitted = beforeFill.body.items.filter((o: { status: string }) => o.status === 'soumis');
-  check('ordre en statut soumis', submitted.length === 1, String(submitted.length));
+  check('ordres en statut soumis', submitted.length === 2, String(submitted.length));
 
   await runExecutionTick();
 
   const afterFill = await json('/api/orders');
   const executed = afterFill.body.items.filter((o: { status: string }) => o.status === 'execute');
-  check('le worker exécute l’ordre', executed.length === 1, String(executed.length));
+  check('le worker exécute les ordres', executed.length === 2, String(executed.length));
   check(
     'la route d’exécution est tracée',
     executed[0]?.executionVenue === 'simulation',
@@ -288,7 +317,7 @@ async function main(): Promise<void> {
 
   const positions = await json('/api/positions');
   check('une position est ouverte', positions.body.length === 1, JSON.stringify(positions.body));
-  check('quantité de position correcte', positions.body[0]?.qty === 5, String(positions.body[0]?.qty));
+  check('quantité de position correcte', positions.body[0]?.qty === 10, String(positions.body[0]?.qty));
 
   // --- Order actions ------------------------------------------------------
   const executedId = executed[0].id;

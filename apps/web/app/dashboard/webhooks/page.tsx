@@ -121,6 +121,19 @@ export default function WebhooksPage() {
       <div className="space-y-4">
         {strategies.map((s) => {
           const webhookUrl = `${origin}/api/webhook/${s.webhookId}`;
+          const tradingViewUrl = `${origin}/api/relay/tradingview/${s.webhookId}`;
+          const tradingViewPayload = JSON.stringify(
+            {
+              passphrase: s.webhookSecret,
+              signalId: '{{timenow}}-{{ticker}}',
+              ticker: '{{ticker}}',
+              action: 'buy',
+              price: '{{close}}',
+              timestamp: '{{timenow}}',
+            },
+            null,
+            2
+          );
           const secretVisible = showSecret[s.id];
           return (
             <Card key={s.id}>
@@ -180,6 +193,47 @@ export default function WebhooksPage() {
                       )}
                     </Button>
                   </div>
+                </div>
+
+                <div>
+                  <p className="mb-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+                    Relais TradingView
+                  </p>
+                  <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
+                    <code className="flex-1 truncate font-mono text-xs">{tradingViewUrl}</code>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-7 w-7 shrink-0"
+                      onClick={() => copy(tradingViewUrl, `tv-url-${s.id}`)}
+                      aria-label="Copier l’URL TradingView"
+                    >
+                      {copied === `tv-url-${s.id}` ? (
+                        <Check className="h-3.5 w-3.5 text-success" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                    </Button>
+                  </div>
+                  <div className="mt-2 flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => copy(tradingViewPayload, `tv-payload-${s.id}`)}
+                    >
+                      {copied === `tv-payload-${s.id}` ? (
+                        <Check className="mr-2 h-3.5 w-3.5 text-success" />
+                      ) : (
+                        <Copy className="mr-2 h-3.5 w-3.5" />
+                      )}
+                      Copier le message TradingView
+                    </Button>
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-muted-foreground">
+                    Collez l’URL et le message dans votre alerte TradingView, puis adaptez
+                    l’action si nécessaire.
+                  </p>
                 </div>
 
                 {/* Secret */}

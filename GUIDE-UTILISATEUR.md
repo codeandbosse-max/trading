@@ -103,9 +103,16 @@ Cliquez sur la carte de votre stratégie pour ouvrir le panneau de détail, puis
 
 Écran **Webhooks**. Chaque stratégie a sa propre adresse et son propre **secret**.
 
-Copiez l'adresse, puis affichez le secret avec l'icône en forme d'œil et copiez-le également. Transmettez les deux à la personne qui configure votre source de signaux.
+Pour une source capable de signer ses messages, copiez l'adresse de réception et le secret avec l'icône en forme d'œil.
 
-> **Important.** Chaque message doit être **signé** avec ce secret, sinon il est refusé. TradingView ne sait pas le faire seul : il faut un intermédiaire technique entre TradingView et SignalDesk. Voyez cela avec votre équipe technique avant de brancher une source.
+**Pour TradingView**, utilisez plutôt le bloc **Relais TradingView** de la stratégie :
+
+1. Copiez l'**URL TradingView** et collez-la dans le champ *Webhook URL* de votre alerte TradingView.
+2. Cliquez sur **Copier le message TradingView**, puis collez ce contenu dans le champ *Message* de l'alerte.
+3. Remplacez la valeur de `action` par l'action souhaitée (`buy`, `sell`, `short`, `cover`, `exit` ou `reverse`).
+4. Créez l'alerte.
+
+Le relais intégré vérifie la `passphrase` incluse dans le message, puis soumet le signal aux mêmes règles de risque que les autres sources. TradingView ne peut pas calculer de signature HMAC : utilisez donc exclusivement cette URL de relais, pas l'URL de réception classique.
 
 ### Étape 5 — Tester à blanc
 
@@ -138,7 +145,7 @@ Vue d'ensemble de vos règles. Le panneau de détail permet de modifier, **dupli
 > Suspendre une stratégie l'arrête immédiatement sans rien effacer. **Préférez toujours « Suspendre » à « Supprimer » :** la suppression efface aussi tous les branchements vers vos comptes, et l'adresse de réception cesse définitivement de fonctionner.
 
 ### Webhooks
-Les adresses de réception, les secrets, et le journal des appels entrants. C'est ici que vous diagnostiquez les problèmes de réception.
+Les adresses de réception, les secrets, le relais TradingView et le journal des appels entrants. C'est ici que vous diagnostiquez les problèmes de réception.
 
 ### Ordres
 Le suivi complet. Filtrez par texte (instrument, stratégie, compte) et par statut. Cliquez sur une ligne pour voir la chronologie, le prix d'exécution et, en cas d'échec, le motif.

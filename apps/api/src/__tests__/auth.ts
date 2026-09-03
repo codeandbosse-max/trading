@@ -9,6 +9,8 @@ interface Res {
 }
 
 export async function authTests(check: Check, base: string, _server: Server): Promise<void> {
+  process.env.AUTH_REQUIRED = 'true';
+
   const call = async (path: string, init: RequestInit = {}, cookie?: string): Promise<Res> => {
     const res = await fetch(`${base}${path}`, {
       ...init,
